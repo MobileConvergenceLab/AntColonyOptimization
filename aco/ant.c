@@ -372,6 +372,11 @@ static void _source_update(AcoTable* table, AntObject* obj, AntModel model)
     // Using "Source update" algorithm introduced in the Paper
     // "A Parallel Ant Colony Optimization Algorithm for All-Pair Routing in MANETs"
 
+    if(ant_object_is_backtracked(obj))
+    {
+        return;
+    }
+
     int previous        = ant_object_previous(obj);
     int source          = obj->source;
     int nhops           = ant_object_nhops(obj);

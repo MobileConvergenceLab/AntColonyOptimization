@@ -4,10 +4,9 @@
 fon/test-int-pair
 fon/test-object
 src/server
-aco/test-aco-table
-aco/test-ant
-aco/test-antk
 aco/aco
+aco/test-obj
+aco/test-table
 test-ipc/main
 test-sendrecv/receiver
 test-sendrecv/sender
