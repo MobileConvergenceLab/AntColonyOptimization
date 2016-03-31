@@ -34,7 +34,7 @@ typedef struct _RealTable {
  *==============================================================================*/
 static const AcoValue DEFAULT_ACO_VALUE =
 {
-    .dest_id    = -1,
+    .target_id    = -1,
     .neigh_id   = -1,
     .tx_count   = 0,
     .rx_count   = 0,
@@ -114,13 +114,13 @@ void aco_table_unref(AcoTable* ftable)
     }
 }
 
-bool aco_table_add_row(AcoTable* ftable, int dest_id)
+bool aco_table_add_row(AcoTable* ftable, int target_id)
 {
     RealTable* table = (RealTable*)ftable;
 
-    if(dest_id == table->host_id            ||
-       _FIND_ROW(table, dest_id)    != -1   ||
-       _FIND_COL(table, dest_id)    != -1)
+    if(target_id == table->host_id            ||
+       _FIND_ROW(table, target_id)    != -1   ||
+       _FIND_COL(table, target_id)    != -1)
     {
         return false;
     }
@@ -133,12 +133,12 @@ bool aco_table_add_row(AcoTable* ftable, int dest_id)
         abort();
     }
 
-    table->row_to_dest[nrow-1] = dest_id;
+    table->row_to_dest[nrow-1] = target_id;
 
     for(int col=0; col<table->ncol; col++)
     {
         table->array[row][col].value             = DEFAULT_ACO_VALUE;
-        table->array[row][col].value.dest_id     = dest_id;
+        table->array[row][col].value.target_id   = target_id;
         table->array[row][col].value.neigh_id    = table->col_to_neigh[col];
         table->array[row][col].value.pheromone   = table->min;
         table->array[row][col].row               = row;
@@ -172,7 +172,7 @@ bool aco_table_add_col(AcoTable* ftable, int neigh_id)
     for(int row=0; row<table->nrow; row++)
     {
         table->array[row][col].value           = DEFAULT_ACO_VALUE;
-        table->array[row][col].value.dest_id   = table->row_to_dest[row];
+        table->array[row][col].value.target_id   = table->row_to_dest[row];
         table->array[row][col].value.neigh_id  = neigh_id;
         table->array[row][col].value.pheromone = table->min;
         table->array[row][col].row             = row;
@@ -182,13 +182,13 @@ bool aco_table_add_col(AcoTable* ftable, int neigh_id)
     return true;
 }
 
-int aco_table_min_hops(AcoTable* ftable, int dest_id)
+int aco_table_min_hops(AcoTable* ftable, int target_id)
 {
     RealTable* table = (RealTable*)ftable;
 
     int         min_hops    = ACO_TABLE_UNDEFINED_NHOPS;
     int         ncol        = table->ncol;
-    int         row         = _FIND_ROW(table, dest_id);
+    int         row         = _FIND_ROW(table, target_id);
     int         hops;
     int         col;
     AcoValue*   value;
@@ -198,7 +198,7 @@ int aco_table_min_hops(AcoTable* ftable, int dest_id)
         return ACO_TABLE_UNDEFINED_NHOPS;
     }
 
-    if(aco_table_is_neigh(ftable, dest_id))
+    if(aco_table_is_neigh(ftable, target_id))
     {
         return 1;
     }
@@ -281,7 +281,7 @@ bool aco_table_get(AcoTable* ftable, AcoValue *value)
 {
     RealTable* table = (RealTable*)ftable;
 
-    int row = _FIND_ROW(table, value->dest_id);
+    int row = _FIND_ROW(table, value->target_id);
     int col = _FIND_COL(table, value->neigh_id);
 
     if(row == -1 || col == -1)
@@ -298,7 +298,7 @@ bool aco_table_set(AcoTable* ftable, const AcoValue *value)
 {
     RealTable* table = (RealTable*)ftable;
 
-    int row = _FIND_ROW(table, value->dest_id);
+    int row = _FIND_ROW(table, value->target_id);
     int col = _FIND_COL(table, value->neigh_id);
 
     if(row == -1 || col == -1)
@@ -329,11 +329,11 @@ void aco_table_iterate_all(AcoTable* ftable, AcoTableIterator updater, void *use
     }
 }
 
-void aco_table_iterate_by_dest(AcoTable* ftable, int dest_id, AcoTableIterator updater, void *userdata)
+void aco_table_iterate(AcoTable* ftable, int target_id, AcoTableIterator updater, void *userdata)
 {
     RealTable* table = (RealTable*)ftable;
 
-    int row = _FIND_ROW(table, dest_id);
+    int row = _FIND_ROW(table, target_id);
     bool ret;
 
     if(row == -1)

@@ -48,7 +48,7 @@ static int _unicast_backward        (AcoTable* table, AntObject* obj);
 static void _register_on_table      (AcoTable* table, AntObject* obj);
 static void _update_statistics      (AcoTable* table, AntObject* obj);
 static void _forward_ant            (Ant* fant);
-static void _iterating_update       (AcoTable* table, AntObject* obj, int dest_id, int neigh_id, int nhops, AntModel model);
+static void _iterating_update       (AcoTable* table, AntObject* obj, int target_id, int neigh_id, int nhops, AntModel model);
 static bool _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
 static void _destination_update     (AcoTable* table, AntObject* obj, int neigh_id, AntModel model);
@@ -211,7 +211,7 @@ static void _unicast_pkt(AcoTable* table, AntObject* obj, int rid)
     AcoValue    value   = {0,};
 
     // increase tx_count
-    value.dest_id = obj->destination;
+    value.target_id = obj->destination;
     value.neigh_id = rid;
     if(aco_table_get(table, &value))
     {
@@ -268,7 +268,7 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
 
     AcoValue value  = {0,};
 
-    value.dest_id   = obj->source;
+    value.target_id   = obj->source;
     value.neigh_id  = ant_object_previous(obj);
 
     aco_table_get(table, &value);
@@ -289,7 +289,7 @@ static bool __pheromone_iterator(AcoTable *table, AcoValue *value, TableIterator
     if(value->neigh_id == args->neigh_id)
     {
         int local_min   = value->min_hops;
-        int global_min  = MIN(aco_table_min_hops(table, value->dest_id), local_min);
+        int global_min  = MIN(aco_table_min_hops(table, value->target_id), local_min);
         int nhops       = args->nhops;
 
         args->model(&value->pheromone, global_min, local_min, nhops);
@@ -309,7 +309,7 @@ static bool _backtrack_update(AcoTable* table, AntObject* obj)
     if(ant_object_is_backtracked(obj))
     {
         int id = ant_object_from(obj);
-        AcoValue value = {.dest_id = obj->destination, .neigh_id = id};
+        AcoValue value = {.target_id = obj->destination, .neigh_id = id};
         aco_table_get(table, &value);
         value.pheromone = 0;
         aco_table_set(table, &value);
@@ -322,12 +322,12 @@ static bool _backtrack_update(AcoTable* table, AntObject* obj)
 
 static void _iterating_update(AcoTable* table,
                             AntObject *obj,
-                            int dest_id,
+                            int target_id,
                             int neigh_id,
                             int nhops,
                             AntModel model)
 {
-    if(dest_id == PACKET_ID_INVALID ||
+    if(target_id == PACKET_ID_INVALID ||
        neigh_id == PACKET_ID_INVALID)
     {
         return;
@@ -348,7 +348,7 @@ static void _iterating_update(AcoTable* table,
     // 모든 인접노드 링크에 대한 페로몬 농도를 갱신한다.
     // 개미가 통과한 링크의 페로몬 농도는 증가 시키고
     // 그 외의 링크의 페로몬 농도는 감소시킨다.
-    aco_table_iterate_by_dest(table, dest_id, (AcoTableIterator)__pheromone_iterator, &args);
+    aco_table_iterate(table, target_id, (AcoTableIterator)__pheromone_iterator, &args);
 
     return;
 }
@@ -363,14 +363,14 @@ static void _source_update(AcoTable* table, AntObject* obj, AntModel model)
         return;
     }
 
-    int previous        = ant_object_previous(obj);
-    int source          = obj->source;
+    int neigh_id        = ant_object_previous(obj);
+    int target          = obj->source;
     int nhops           = ant_object_nhops(obj);
 
     _iterating_update(table,
                       obj,
-                      source,
-                      previous,
+                      target,
+                      neigh_id,
                       nhops,
                       model);
 }
@@ -382,12 +382,12 @@ static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, A
         return;
     }
 
-    int destination     = obj->destination;
+    int target          = obj->destination;
     int nhops           = ant_object_nhops(obj) + 1;
 
     _iterating_update(table,
                       obj,
-                      destination,
+                      target,
                       neigh_id,
                       nhops,
                       model);
@@ -421,7 +421,7 @@ static GPtrArray* get_did_candidates(const AntObject* obj, AcoTable* table)
     GPtrArray*      candidates      = g_ptr_array_new();
     TestArg         arg             = {candidates, obj};
 
-    aco_table_iterate_by_dest(table, obj->destination, test, &arg);
+    aco_table_iterate(table, obj->destination, test, &arg);
 
     return candidates;
 }
