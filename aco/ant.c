@@ -99,7 +99,8 @@ void ant_send(Ant* fant)
 {
     RealAnt* ant = (RealAnt*)fant;
 
-    if(ant_object_get_ttl(ant->obj) == 0) {
+    if(ant_object_get_ttl(ant->obj) == 0 ||
+       ant->obj->destination == ant->table->host_id) {
         /* Drop Packet */
         return;
     }
@@ -133,7 +134,7 @@ void ant_callback(Ant* fant)
     }
 
     ant->op.callback(ant);
-    _forward_ant(fant);
+    ant_send(fant);
 }
 
 Ant* ant_restore(const packet* pkt, AcoTable* table)
@@ -278,21 +279,6 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
 
         value.rx_count++;
         aco_table_set(table, &value);
-    }
-}
-
-static void _forward_ant(Ant* fant)
-{
-    RealAnt* ant = (RealAnt*)fant;
-
-    if(ant->obj->destination != ant->table->host_id)
-    {
-        ant_send(fant);
-    }
-    else
-    {
-        // Drop packet.
-        // Do nothing.
     }
 }
 
