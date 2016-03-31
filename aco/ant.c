@@ -634,7 +634,7 @@ static void forward_callback(RealAnt* ant)
     AntObject* obj = ant->obj;
 
     #if ANT_SOURCE_UPDATE
-    _source_update(ant->table, ant->obj, ant_system_model);
+    _source_update(ant->table, ant->obj, ANT_MODEL_SELECTOR);
     #endif
 
     ant_object_change_direction(obj);
