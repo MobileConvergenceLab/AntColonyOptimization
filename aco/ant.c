@@ -275,7 +275,7 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
 
     if(aco_table_get(table, &value))
     {
-        value.min_hops = MIN(ant_object_nhops(obj), value.min_hops);
+        value.min_hops = ant_object_nhops(obj);
 
         value.rx_count++;
         aco_table_set(table, &value);
@@ -329,11 +329,6 @@ static void _iterating_update(AcoTable* table,
 {
     if(target_id == PACKET_ID_INVALID ||
        neigh_id == PACKET_ID_INVALID)
-    {
-        return;
-    }
-
-    if(ant_object_is_backtracked(obj))
     {
         return;
     }
