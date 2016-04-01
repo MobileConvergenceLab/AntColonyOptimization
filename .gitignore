@@ -12,4 +12,3 @@ test-sendrecv/receiver
 test-sendrecv/sender
 tags
 emulation/*
-aco/parameters.h
