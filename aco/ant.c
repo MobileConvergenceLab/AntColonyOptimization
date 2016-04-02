@@ -462,13 +462,16 @@ static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
 typedef struct _Candidates
 {
     AcoValue        candi[ACO_TABLE_MAX_COL];
-    pheromone_t     dummy;
+    pheromone_t     initial_accumulated;
     pheromone_t     accumulated[ACO_TABLE_MAX_COL];
     int len;
     bool last_is_never_visited;
 } Candidates;
 
-CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, dummy) + sizeof(pheromone_t), ant_c);
+/**
+ * It means(asserts) that "accumulated[-1] == initial_accumulated".
+ */
+CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, initial_accumulated) + sizeof(pheromone_t), ant_c);
 
 typedef struct _CandiArg
 {
@@ -502,7 +505,7 @@ static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
 {
     Candidates*      candidates      = malloc(sizeof(Candidates));
 
-    candidates->dummy                   = 0.0;
+    candidates->initial_accumulated     = 0.0;
     candidates->len                     = 0;
     candidates->last_is_never_visited   = false;
 
@@ -564,7 +567,7 @@ static int _select_neighbor(AcoTable* table, AntObject* obj)
         goto RETURN;
     }
 
-    // If there is the never visited node,
+    // If there is the node never visited,
     // Give it a preference.
     if(candidates->last_is_never_visited)
     {

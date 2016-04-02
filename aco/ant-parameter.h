@@ -1,5 +1,5 @@
-#ifndef PARAMETERS_H
-#define PARAMETERS_H
+#ifndef ANT_PARAMETERS_H
+#define ANT_PARAMETERS_H
 
 /*==============================================================================
  * Parameters

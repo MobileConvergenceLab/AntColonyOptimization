@@ -1,5 +1,5 @@
 CC          = gcc
-CFLAGS      = -c -pthread -std=c11
+CFLAGS      = -c -pthread -std=c99
 CFLAGS      += -Wall -Wno-unused-function
 CFLAGS      += -g
 INCLUDE     = `pkg-config --cflags glib-2.0`
@@ -228,9 +228,9 @@ ant.o: ant.c /usr/include/stdc-predef.h fon/packet_if.h \
  /usr/include/x86_64-linux-gnu/bits/stdlib-float.h fon/common-defs.h \
  fon/algorithm.h aco-table.h ant-type.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdbool.h ant.h ant-def.h \
- ant-parameter.h ant-obj.h ant-model.h main.h /usr/include/stdio.h \
- /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
- /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
+ ant-parameter.h ant-obj.h ant-model.h main.h cassert.h \
+ /usr/include/stdio.h /usr/include/libio.h /usr/include/_G_config.h \
+ /usr/include/wchar.h /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
  /usr/include/x86_64-linux-gnu/bits/sys_errlist.h /usr/include/assert.h
 ant-model.o: ant-model.c /usr/include/stdc-predef.h ant-model.h \
  ant-type.h /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdbool.h ant-def.h \

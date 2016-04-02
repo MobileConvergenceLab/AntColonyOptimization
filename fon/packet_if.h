@@ -2,6 +2,7 @@
 #define PACKET_IF_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 enum PACKET_TYPE {
     PACKET_TYPE_NONE    = 0,
