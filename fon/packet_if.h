@@ -38,10 +38,14 @@ typedef union _packet {
 static inline void
 pkt_hdr_print(const packet *pkt)
 {
-    g_print("pkt_sid:  %d\n", pkt->hdr.pkt_sid);
-    g_print("pkt_did:  %d\n", pkt->hdr.pkt_did);
-    g_print("pkt_type: %d\n", pkt->hdr.pkt_type);
-    g_print("pkt_len:  %d\n", pkt->hdr.pkt_len);
+    printf("pkt_sid:  %d\n"
+           "pkt_did:  %d\n"
+           "pkt_type: %d\n"
+           "pkt_len:  %d\n",
+           pkt->hdr.pkt_sid,
+           pkt->hdr.pkt_did,
+           pkt->hdr.pkt_type,
+           pkt->hdr.pkt_len);
 }
 
 static inline void

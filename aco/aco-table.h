@@ -1,10 +1,10 @@
 #ifndef AcoTable_H
 #define AcoTable_H
 
-#include <stdbool.h>
-#include "aco-table-def.h"
+#include "ant-type.h"
 
-typedef double pheromone_t;
+#define ACO_TABLE_MAX_ROW               (512)
+#define ACO_TABLE_MAX_COL               (16)
 
 typedef struct _AcoValue {
     int         target_id;

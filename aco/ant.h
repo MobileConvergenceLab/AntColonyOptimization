@@ -1,7 +1,6 @@
 #ifndef ANT_H
 #define ANT_H
 
-#include <glib.h>
 #include "ant-def.h"
 #include "ant-obj.h"
 #include "fon/packet_if.h"

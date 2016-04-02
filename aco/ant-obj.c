@@ -1,4 +1,3 @@
-#include "ant-obj.h"
 #include <stdint.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
@@ -6,11 +5,15 @@
 #include <assert.h>
 #include <string.h>
 
+#include "ant-obj.h"
+#include "ant-def.h"
+
 /*==============================================================================
  * Private Declaration
  *==============================================================================*/
-#define _INVALID_VALUE  (-1)
-#define _MAGIC_INDEX    (ANT_OBJ_MAXIMUM_ARR_SIZE)
+#define _INVALID_VALUE                  (-1)
+#define ANT_OBJ_MAXIMUM_ARR_SIZE        (ANT_MAXIMUM_TTL)
+#define _MAGIC_INDEX                    (ANT_OBJ_MAXIMUM_ARR_SIZE)
 
 static const char _DirectionString[][64] = {
     "ANT_OBJ_DIRECTION_FORWARD",

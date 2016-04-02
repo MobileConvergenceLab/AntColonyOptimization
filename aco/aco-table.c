@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 
 #include "fon/algorithm.h"
+
+#define ACO_TABLE_UNDEFINED_NHOPS       (INT_MAX)
 
 /*==============================================================================
  * Private Type Declarations

@@ -1,14 +1,22 @@
-#include "ant.h"
 #include "fon/packet_if.h"
-#include "aco-table.h"
 #include "fon/fon.h"
 #include "fon/algorithm.h"      /* max, min, swap */
+
+#include "aco-table.h"
+#include "ant.h"
+#include "ant-model.h"
 #include "main.h"
 
-#include "main-def.h"
+#include "cassert.h"
 
 #include <stdio.h>
 #include <assert.h>
+#include <stddef.h>
+
+/*==============================================================================
+ * Private Data
+ *==============================================================================*/
+static AntCallbackLogger  STATIC_LOGGER = NULL;
 
 /*==============================================================================
  * Private Type Declarations
@@ -25,8 +33,6 @@ struct _RealAnt {
     AntObject*  obj;
     AntOperator op;
 };
-
-typedef void (*AntModel)(pheromone_t *ph, int global_min, int local_min, int nhops);
 
 typedef struct _TableIteratorArgs
 {
@@ -52,7 +58,7 @@ static void _iterating_update       (AcoTable* table, AntObject* obj, int target
 static bool _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
 static void _destination_update     (AcoTable* table, AntObject* obj, int neigh_id, AntModel model);
-static int _calc_neigh              (AcoTable* table, AntObject* obj);
+static int _select_neighbor         (AcoTable* table, AntObject* obj);
 
 /*==============================================================================
  * Virtual Function Declarations
@@ -73,16 +79,6 @@ static const AntOperator ant_ops[] = {
     {forward_send,      forward_callback},      /* ANT_TYPE_FORWARD     */
     {NULL,              NULL}                   /* ANT_TYPE_WRONG       */
 };
-
-/*==============================================================================
- * Ant Model Declarations
- *==============================================================================*/
-static void ant_normalizing_model   (pheromone_t *ph, int global_min, int local_min, int nhops);
-static void ant_local_model         (pheromone_t *ph, int global_min, int local_min, int nhops);
-static void ant_density_model       (pheromone_t *ph, int global_min, int local_min, int nhops);
-static void ant_system_model        (pheromone_t *ph, int global_min, int local_min, int nhops);
-
-static AntCallbackLogger  STATIC_LOGGER = NULL;
 
 /*==============================================================================
  * Public Function Implentations
@@ -160,7 +156,7 @@ Ant* ant_factory(int type, int source, int destination, AcoTable* table)
     obj = ant_object_new(source,
                          destination,
                          type,
-                         ANT_DEFAULT_TTL);
+                         ANT_MAXIMUM_TTL);
 
     return (Ant*)_real_ant_new(table, obj, ant_ops[obj->type]);
 }
@@ -228,7 +224,7 @@ static void _unicast_pkt(AcoTable* table, AntObject* obj, int rid)
 
 static int _unicast_forward(AcoTable* table, AntObject* obj)
 {
-    int         rid     = _calc_neigh(table, obj);
+    int         rid     = _select_neighbor(table, obj);
 
     _unicast_pkt(table, obj, rid);
 
@@ -388,22 +384,113 @@ static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, A
                       model);
 }
 
-typedef struct _TestArg
+typedef struct _TableACSIteratorArgs
 {
-    GPtrArray*          candidates;
+    int         neigh_id;
+    int         global_min;
+    int         nhops;
+} TableACSIteratorArgs;
+
+static bool __acs_pheromone_iterator(AcoTable *table, AcoValue *value, TableACSIteratorArgs *args)
+{
+    // 증가
+    if(value->neigh_id == args->neigh_id)
+    {
+        int nhops       = args->nhops;
+
+        ant_colony_system_model(&value->pheromone, args->global_min, -1, nhops);
+    }
+    // 감소
+    else
+    {
+        /* multiply the complement of evaporation rate */
+        value->pheromone *= ANT_REMAINS_RATE;
+    }
+
+    return true;
+}
+
+static void _acs_iterating_update(AcoTable* table,
+                            AntObject *obj,
+                            int neigh_id,
+                            int nhops)
+{
+    if(obj->destination == PACKET_ID_INVALID ||
+       neigh_id == PACKET_ID_INVALID)
+    {
+        return;
+    }
+
+    if(ant_object_is_backtracked(obj))
+    {
+        return;
+    }
+
+    TableACSIteratorArgs args =
+                    {
+                    .neigh_id       = neigh_id,
+                    .global_min     = aco_table_min_hops(table, obj->source),
+                    .nhops          = nhops,
+                    };
+
+    // 모든 인접노드 링크에 대한 페로몬 농도를 갱신한다.
+    // 개미가 통과한 링크의 페로몬 농도는 증가 시키고
+    // 그 외의 링크의 페로몬 농도는 감소시킨다.
+    aco_table_iterate(table, obj->destination, (AcoTableIterator) __acs_pheromone_iterator, &args);
+
+    return;
+}
+
+static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
+{
+    if(ant_object_is_visited(obj, neigh_id))
+    {
+        return;
+    }
+
+    int nhops           = ant_object_nhops(obj) + 1;
+
+    _acs_iterating_update(table,
+                      obj,
+                      neigh_id,
+                      nhops);
+}
+
+/*
+ * BEGINNING of _select_neighbor()
+ */
+typedef struct _Candidates
+{
+    AcoValue        candi[ACO_TABLE_MAX_COL];
+    pheromone_t     dummy;
+    pheromone_t     accumulated[ACO_TABLE_MAX_COL];
+    int len;
+    bool last_is_never_visited;
+} Candidates;
+
+CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, dummy) + sizeof(pheromone_t), ant_c);
+
+typedef struct _CandiArg
+{
+    Candidates*         candidates;
     const AntObject*    obj;
-} TestArg;
+} CandiArg;
 
-bool test(AcoTable *table, AcoValue *value, void *userdata)
+bool iterator_add_candi(AcoTable *table, AcoValue *value, CandiArg* arg)
 {
-    TestArg* arg = (TestArg*)userdata;
+    Candidates* candidates = arg->candidates;
 
-    // 개미가 방문한 노드가 아니면 후보에 추가한다.
     if(!ant_object_is_visited(arg->obj, value->neigh_id))
     {
-        g_ptr_array_add(arg->candidates, value);
+        candidates->candi[candidates->len] = *value;
+        candidates->accumulated[candidates->len] = candidates->accumulated[candidates->len-1] + value->pheromone;
+        candidates->len++;
+
+        // If the given neighbor is never visited,
+        // stop iterating and return.
         if(value->tx_count == 0)
         {
+            candidates->last_is_never_visited = true;
             return false;
         }
     }
@@ -411,136 +498,93 @@ bool test(AcoTable *table, AcoValue *value, void *userdata)
     return true;
 }
 
-static GPtrArray* get_did_candidates(const AntObject* obj, AcoTable* table)
+static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
 {
-    GPtrArray*      candidates      = g_ptr_array_new();
-    TestArg         arg             = {candidates, obj};
+    Candidates*      candidates      = malloc(sizeof(Candidates));
 
-    aco_table_iterate(table, obj->destination, test, &arg);
+    candidates->dummy                   = 0.0;
+    candidates->len                     = 0;
+    candidates->last_is_never_visited   = false;
+
+    CandiArg         arg             = {candidates, obj};
+
+    aco_table_iterate(table, obj->destination, (AcoTableIterator)iterator_add_candi, &arg);
 
     return candidates;
 }
 
-static int calc_randomly_neigh(const GPtrArray* candidate)
+static inline void _candidates_free(Candidates* candidates)
 {
-    g_assert(candidate->len > 0);
+    free(candidates);
+}
 
-    typedef struct _Accumlated{
-        int     id;
-        double  accumulated;
-    } Accumlated;
+static int _select_neighbor_randomly(const Candidates* candidates)
+{
+    g_assert(candidates->len > 0);
 
-    Accumlated  ap              = {0, };
-    AcoValue*   value           = NULL;
     pheromone_t sum_pheromone   = 0;
-    const int   len             = candidate->len;
-    int         did             = PACKET_ID_INVALID;
+    const int   len             = candidates->len;
+    int         neigh_id             = PACKET_ID_INVALID;
     double      random          = 0;
-    GArray*     ap_array        = g_array_sized_new(FALSE,
-                                    FALSE, sizeof(Accumlated), len);
 
-    ap.id = PACKET_ID_INVALID;
-    ap.accumulated = 0.0;
-    //
-    for(int i=0; i< len; i++)
-    {
-        value = (AcoValue*)g_ptr_array_index(candidate, i);
-        ap.id             = value->neigh_id;
-        ap.accumulated    += value->pheromone;
-        g_array_append_val(ap_array, ap);
-    }
-
-    //
-    sum_pheromone = g_array_index(ap_array, Accumlated, len-1).accumulated;
+    sum_pheromone = candidates->accumulated[len-1];
     random = g_random_double_range(0, sum_pheromone);
     for(int i=0; i<len; i++)
     {
-        ap = g_array_index(ap_array, Accumlated, i);
-        if(random < ap.accumulated)
+        if(random < candidates->accumulated[i])
         {
-            did = ap.id;
+            neigh_id = candidates->candi[i].neigh_id;
             break;
         }
     }
 
-    g_array_unref(ap_array);
-
-    return did;
+    return neigh_id;
 }
 
-static int _calc_neigh(AcoTable* table, AntObject* obj)
+static int _select_neighbor(AcoTable* table, AntObject* obj)
 {
     int             destination     = obj->destination;
-    int             did             = PACKET_ID_INVALID;       /* neigh_id(next hop id) */
-    GPtrArray*      candidates      = NULL;     /* array of AcoValue* */
-    AcoValue*       unvisited       = NULL;
+    int             neigh_id        = PACKET_ID_INVALID;
+    Candidates*     candidates      = NULL;
 
-    // 목적지가 인접한 노드면, 즉시 리턴한다.
     if(aco_table_is_neigh(table, destination))
     {
-        did = destination;
-        return did;
+        neigh_id = destination;
+        return neigh_id;
     }
 
-    // loop 발생시키는 노드 등을 제외한
-    // neighbor가 될 수 있는 후보들을 얻는다.
-    candidates = get_did_candidates(obj, table);
+    // Get neighbor nodes that do not make loop.
+    candidates = _candidates_new(obj, table);
 
-    // 만약 후보가 없다면
-    // backtracking 할 수 있도록 한다.
+    // If there are no candidates
+    // Do backtracking
     if(candidates->len == 0)
     {
-        did = ant_object_previous(obj);
+        neigh_id = ant_object_previous(obj);
         goto RETURN;
     }
 
-    // unvisited neighbor node가 존재하면
-    // 페로몬 양에 관계없이 해당 노드에 최우선권을 준다.
-    unvisited = g_ptr_array_index(candidates, candidates->len -1);
-    if(!unvisited->tx_count)
+    // If there is the never visited node,
+    // Give it a preference.
+    if(candidates->last_is_never_visited)
     {
-        did = unvisited->neigh_id;
+        neigh_id = candidates->candi[candidates->len-1].neigh_id;
         goto RETURN;
     }
 
-    // 만약 모두 적어도 한번 방문했으면,
-    // 페로몬양을 고려하여 확률에 기반한 다음 후보를 고른다.
-    did = calc_randomly_neigh(candidates);
+    // If all nodes are visited at least once,
+    // Randomly select a node considering the pheromone concentration.
+    neigh_id = _select_neighbor_randomly(candidates);
 
 RETURN:
-    g_ptr_array_unref(candidates);
+    _candidates_free(candidates);
 
-    return did;
+    return neigh_id;
 }
 
-/*==============================================================================
- * Ant Model Implementations
- *==============================================================================*/
-static void ant_normalizing_model(pheromone_t *ph, int global_min, int local_min, int nhops)
-{
-    int normalized = local_min - global_min + 1;
-    int divider = normalized*normalized;
-
-    // 정규화된 거리를 이용하여 페로몬을 갱신한다.
-    // ANT_COCENTRATION_CONST를 적절히 선택했기 때문에
-    // ACO_TABLE_PHEROMONE_MAX 값을 넘어 설 수 없다.
-    *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(divider);
-}
-
-static void ant_local_model(pheromone_t *ph, int global_min, int local_min, int nhops)
-{
-    *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(local_min);
-}
-
-static void ant_density_model(pheromone_t *ph, int global_min, int local_min, int nhops)
-{
-    *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST;
-}
-
-static void ant_system_model(pheromone_t *ph, int global_min, int local_min, int nhops)
-{
-    *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(nhops);
-}
+/*
+ * END of _select_neighbor()
+ */
 
 /*==============================================================================
  * Virtual Function Implementations
@@ -605,13 +649,12 @@ static void forward_send(RealAnt* ant)
 
     if(ant_object_get_direction(obj) == ANT_OBJ_DIRECTION_FORWARD)
     {
-        #if ANT_DESTINATION_UPDATE
         int neigh_id = _unicast_forward(table, obj);
-        _destination_update(table, obj, neigh_id, ANT_MODEL_SELECTOR);
-        #endif /* ANT_DESTINATION_UPDATE */
 
-        #if ANT_SOURCE_UPDATE
-        _unicast_forward(table, obj);
+        #if ANT_DESTINATION_UPDATE
+        _destination_update(table, obj, neigh_id, ANT_MODEL_SELECTOR);
+        #elif ANT_ACS_UPDATE
+        _acs_update(table, obj, neigh_id);
         #endif
     }
     else if(ant_object_get_direction(obj) ==  ANT_OBJ_DIRECTION_BACKWARD)
@@ -634,7 +677,6 @@ static void forward_callback(RealAnt* ant)
 
     ant_object_change_direction(obj);
 }
-
 
 
 

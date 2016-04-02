@@ -4,11 +4,7 @@
 #ifndef ANT_OBJ_H
 #define ANT_OBJ_H
 
-#include <stdbool.h>
-#include <stddef.h>
-
-// The maximum value is Depend on MTU.
-#define ANT_OBJ_MAXIMUM_ARR_SIZE        (128)
+#include "ant-type.h"
 
 // Direction constant
 typedef enum _AntObjectDirection
