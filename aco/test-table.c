@@ -19,11 +19,42 @@ AcoTable* test_new()
     return table;
 }
 
+void test_iter(AcoTable* table, int target_id)
+{
+    AcoTableIter iter;
+
+    printf("I want to iterate, target_id is %d\n", target_id);
+
+    if(!aco_table_iter_begin(table, target_id, &iter))
+    {
+        printf("There is no target_id %d in the given table\n\n", target_id);
+        return;
+    }
+
+    do
+    {
+        printf("target_id %d, neigh_id %d\n", iter.value.target_id, iter.value.neigh_id);
+    }
+    while(aco_table_iter_next(table, &iter));
+
+    printf("\n");
+
+    return;
+}
+
 int main(int argc, char **argv) {
 
     AcoTable* table = test_new();
 
     aco_table_print_all(table);
+
+    test_iter(table, 0);
+    test_iter(table, 1);
+    test_iter(table, 2);
+
+    test_iter(table, 3);
+    test_iter(table, 4);
+    test_iter(table, 5);
 
     printf("Test Successful\n");
 

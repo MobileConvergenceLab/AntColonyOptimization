@@ -352,6 +352,55 @@ void aco_table_iterate(AcoTable* ftable, int target_id, AcoTableIterator updater
     }
 }
 
+bool aco_table_iter_begin(AcoTable* ftable, int target_id, AcoTableIter *iter)
+{
+    RealTable* table = (RealTable*)ftable;
+
+    if(table->ncol == 0)
+    {
+        return false;
+    }
+
+    int row = _FIND_ROW(table, target_id);
+    if(row == -1)
+    {
+        iter->index = -1;
+        return false;
+    }
+
+    iter->value = table->array[row][0].value;
+    iter->index = 0;
+
+    return true;
+}
+
+bool aco_table_iter_next(AcoTable* ftable, AcoTableIter *iter)
+{
+    RealTable* table = (RealTable*)ftable;
+
+    int row = _FIND_ROW(table, iter->value.target_id);;
+    int index = iter->index;
+
+    if(row == -1)
+    {
+        iter->index = -1;
+        return false;
+    }
+
+    if(index < 0 ||
+       index == table->ncol-1)
+    {
+        iter->index = -1;
+        return false;
+    }
+
+    index++;
+    iter->value = table->array[row][index].value;
+    iter->index = index;
+
+    return true;
+}
+
 int* aco_table_new_neighs(AcoTable* ftable)
 {
     RealTable* table = (RealTable*)ftable;
