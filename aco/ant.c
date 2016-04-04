@@ -285,7 +285,7 @@ static bool __pheromone_iterator(AcoTable *table, AcoValue *value, TableIterator
     if(value->neigh_id == args->neigh_id)
     {
         int local_min   = value->min_hops;
-        int global_min  = MIN(aco_table_min_hops(table, value->target_id), local_min);
+        int global_min  = aco_table_min_hops(table, value->target_id);
         int nhops       = args->nhops;
 
         args->model(&value->pheromone, global_min, local_min, nhops);
@@ -464,7 +464,7 @@ typedef struct _Candidates
     AcoValue        candi[ACO_TABLE_MAX_COL];
     pheromone_t     initial_accumulated;
     pheromone_t     accumulated[ACO_TABLE_MAX_COL];
-    int len;
+    int             len;
     bool last_is_never_visited;
 } Candidates;
 
@@ -473,46 +473,44 @@ typedef struct _Candidates
  */
 CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, initial_accumulated) + sizeof(pheromone_t), ant_c);
 
-typedef struct _CandiArg
-{
-    Candidates*         candidates;
-    const AntObject*    obj;
-} CandiArg;
-
-bool iterator_add_candi(AcoTable *table, AcoValue *value, CandiArg* arg)
-{
-    Candidates* candidates = arg->candidates;
-
-    if(!ant_object_is_visited(arg->obj, value->neigh_id))
-    {
-        candidates->candi[candidates->len] = *value;
-        candidates->accumulated[candidates->len] = candidates->accumulated[candidates->len-1] + value->pheromone;
-        candidates->len++;
-
-        // If the given neighbor is never visited,
-        // stop iterating and return.
-        if(value->tx_count == 0)
-        {
-            candidates->last_is_never_visited = true;
-            return false;
-        }
-    }
-
-    return true;
-}
-
 static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
 {
-    Candidates*      candidates      = malloc(sizeof(Candidates));
+    Candidates*     candidates      = malloc(sizeof(Candidates));
+    AcoTableIter    iter            = {{0,}};
+    AcoValue        *value          = NULL;
 
     candidates->initial_accumulated     = 0.0;
     candidates->len                     = 0;
     candidates->last_is_never_visited   = false;
 
-    CandiArg         arg             = {candidates, obj};
+    if(!aco_table_iter_begin(table, obj->destination, &iter))
+    {
+        goto RETURN;
+    }
 
-    aco_table_iterate(table, obj->destination, (AcoTableIterator)iterator_add_candi, &arg);
+    // iterating
+    do
+    {
+        value = &iter.value;
 
+        if(!ant_object_is_visited(obj, value->neigh_id))
+        {
+            candidates->candi[candidates->len] = *value;
+            candidates->accumulated[candidates->len] = candidates->accumulated[candidates->len-1] + value->pheromone;
+            candidates->len++;
+
+            // If the given neighbor is never visited,
+            // stop iterating and return.
+            if(value->tx_count == 0)
+            {
+                candidates->last_is_never_visited = true;
+                goto RETURN;
+            }
+        }
+    }
+    while(aco_table_iter_next(table, &iter));
+
+RETURN:
     return candidates;
 }
 
