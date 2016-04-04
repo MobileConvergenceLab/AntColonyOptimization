@@ -162,17 +162,23 @@ static gboolean init(MainObj *obj, int port) {
         exit(EXIT_FAILURE);
     }
 
-#if FORWARD_PERIOD_MS&&FORWARD_TARGET
+#if CYCLE_PERIOD_MS&&FORWARD_TARGET
     if(host_id == 0)
     {
         //g_print("Call forward_timeout_add()\n");
-        if(!add_timeout_source(obj, (GSourceFunc)forward_timeout_event_hlder, FORWARD_PERIOD_MS))
+        if(!add_timeout_source(obj, (GSourceFunc)forward_timeout_event_hlder, CYCLE_PERIOD_MS))
         {
             perror("Call forward_timeout_add()");
             exit(EXIT_FAILURE);
         }
     }
-#endif /* FORWARD_PERIOD_MS */
+#endif /* CYCLE_PERIOD_MS */
+
+    if(!add_timeout_source(obj, (GSourceFunc)table_update_timeout_event_hlder, CYCLE_PERIOD_MS))
+    {
+        perror("Call forward_timeout_add()");
+        exit(EXIT_FAILURE);
+    }
 
     //g_print("Call fon_set_callback_recv()\n");
     fon_set_callback_recv((FonCallbackRecv)recv_callack, obj);
@@ -211,7 +217,7 @@ static gboolean flood_timeout_event_hlder(MainObj *obj) {
 static gboolean oneway_timeout_event_hlder(MainObj *obj)
 {
     static int i = 0;
-    if(i++ < HOW_MANY_TX)
+    if(i++ < NUMBER_OF_CYCLES)
     {
         int dummy           = -1;
         int source          = obj->table->host_id;
@@ -246,15 +252,19 @@ static gboolean oneway_timeout_event_hlder(MainObj *obj)
 
 static gboolean forward_timeout_event_hlder(MainObj *obj)
 {
-    static int i = 0;
-    if(i++ < HOW_MANY_TX)
+    static int cycle = 0;
+    if(cycle++ < NUMBER_OF_CYCLES)
     {
         int source          = obj->table->host_id;
         Ant* ant            = ant_factory(ANT_TYPE_FORWARD,
                                             source,
                                             FORWARD_TARGET,
                                             obj->table);
-        ant_send(ant);
+
+        for(int i=0; i< PACKETS_PER_CYCLE; i++)
+        {
+            ant_send(ant);
+        }
         ant_unref(ant);
     }
     else

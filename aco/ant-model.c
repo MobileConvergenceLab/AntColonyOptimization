@@ -11,7 +11,7 @@ void ant_normalizing_model(pheromone_t *ph, int global_min, int local_min, int n
         // 정규화된 거리를 이용하여 페로몬을 갱신한다.
         // ANT_COCENTRATION_CONST를 적절히 선택했기 때문에
         // ACO_TABLE_PHEROMONE_MAX 값을 넘어 설 수 없다.
-        *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(divider);
+        *ph += ANT_COCENTRATION_CONST / (double)(divider);
     }
     else
     {
@@ -23,7 +23,7 @@ void ant_local_model(pheromone_t *ph, int global_min, int local_min, int nhops, 
 {
     if(increase)
     {
-        *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(local_min);
+        *ph += ANT_COCENTRATION_CONST / (double)(local_min);
     }
     else
     {
@@ -35,7 +35,7 @@ void ant_density_model(pheromone_t *ph, int global_min, int local_min, int nhops
 {
     if(increase)
     {
-        *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST;
+        *ph += ANT_COCENTRATION_CONST;
     }
     else
     {
@@ -47,7 +47,7 @@ void ant_system_model(pheromone_t *ph, int global_min, int local_min, int nhops,
 {
     if(increase)
     {
-        *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(nhops);
+        *ph += ANT_COCENTRATION_CONST / (double)(nhops);
     }
     else
     {
@@ -59,7 +59,7 @@ void ant_colony_system_model(pheromone_t *ph, int global_min, int local_min, int
 {
     if(increase &&global_min == nhops)
     {
-        *ph = (*ph)*ANT_REMAINS_RATE + ANT_COCENTRATION_CONST / (double)(nhops);
+        *ph += ANT_COCENTRATION_CONST / (double)(nhops);
     }
     else
     {

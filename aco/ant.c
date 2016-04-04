@@ -298,6 +298,36 @@ static void _iterating_update(AcoTable* table,
         return;
     }
 
+    AcoValue value =
+        {
+            .target_id = target_id,
+            .neigh_id = neigh_id,
+        };
+
+    if(aco_table_get(table, &value))
+    {
+        int local_min   = value.min_hops;
+        int global_min  = aco_table_min_hops(table, value.target_id);
+        model(&value.pheromone, global_min, local_min, nhops, true);
+        aco_table_set(table, &value);
+    }
+
+    return;
+}
+
+static void _iterating_update2(AcoTable* table,
+                            AntObject *obj,
+                            int target_id,
+                            int neigh_id,
+                            int nhops,
+                            AntModel model)
+{
+    if(target_id == PACKET_ID_INVALID ||
+       neigh_id == PACKET_ID_INVALID)
+    {
+        return;
+    }
+
     AcoTableIter    iter            = {{0,}};
 
     if(!aco_table_iter_begin(table, target_id, &iter))
