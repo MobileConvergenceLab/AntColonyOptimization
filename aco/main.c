@@ -98,7 +98,7 @@ static gboolean table_init_from_daemon(AcoTable *table) {
 
     /* wait for the local daemon to make up the forwarding table.
     During this time, the daemon communicates with neighbor daemons. */
-    sleep(2);
+    //sleep(2);
 
     fon_table_get(&tuple_array);
     len = tuple_array->len;

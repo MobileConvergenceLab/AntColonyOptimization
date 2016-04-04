@@ -34,15 +34,6 @@ struct _RealAnt {
     AntOperator op;
 };
 
-typedef struct _TableIteratorArgs
-{
-    int         neigh_id;
-    int         nhops;
-    AntModel    model;
-} TableIteratorArgs;
-
-
-
 /*==============================================================================
  * Common Private Function Declarations
  *==============================================================================*/
@@ -278,28 +269,6 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
     }
 }
 
-// Compatible with AcoTableIterator
-static bool __pheromone_iterator(AcoTable *table, AcoValue *value, TableIteratorArgs *args)
-{
-    // 증가
-    if(value->neigh_id == args->neigh_id)
-    {
-        int local_min   = value->min_hops;
-        int global_min  = aco_table_min_hops(table, value->target_id);
-        int nhops       = args->nhops;
-
-        args->model(&value->pheromone, global_min, local_min, nhops);
-    }
-    // 감소
-    else
-    {
-        /* multiply the complement of evaporation rate */
-        value->pheromone *= ANT_REMAINS_RATE;
-    }
-
-    return true;
-}
-
 static bool _backtrack_update(AcoTable* table, AntObject* obj)
 {
     if(ant_object_is_backtracked(obj))
@@ -329,17 +298,25 @@ static void _iterating_update(AcoTable* table,
         return;
     }
 
-    TableIteratorArgs args =
-                    {
-                    .neigh_id       = neigh_id,
-                    .nhops          = nhops,
-                    .model          = model
-                    };
+    AcoTableIter    iter            = {{0,}};
 
-    // 모든 인접노드 링크에 대한 페로몬 농도를 갱신한다.
-    // 개미가 통과한 링크의 페로몬 농도는 증가 시키고
-    // 그 외의 링크의 페로몬 농도는 감소시킨다.
-    aco_table_iterate(table, target_id, (AcoTableIterator)__pheromone_iterator, &args);
+    if(!aco_table_iter_begin(table, target_id, &iter))
+    {
+        return;
+    }
+
+    do
+    {
+        AcoValue *value = &iter.value;
+        bool increase   = value->neigh_id == neigh_id;
+        int local_min   = value->min_hops;
+        int global_min  = aco_table_min_hops(table, value->target_id);
+
+        model(&value->pheromone, global_min, local_min, nhops, increase);
+
+        aco_table_set(table, value);
+    }
+    while(aco_table_iter_next(table, &iter));
 
     return;
 }
@@ -384,63 +361,6 @@ static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, A
                       model);
 }
 
-typedef struct _TableACSIteratorArgs
-{
-    int         neigh_id;
-    int         global_min;
-    int         nhops;
-} TableACSIteratorArgs;
-
-static bool __acs_pheromone_iterator(AcoTable *table, AcoValue *value, TableACSIteratorArgs *args)
-{
-    // 증가
-    if(value->neigh_id == args->neigh_id)
-    {
-        int nhops       = args->nhops;
-
-        ant_colony_system_model(&value->pheromone, args->global_min, -1, nhops);
-    }
-    // 감소
-    else
-    {
-        /* multiply the complement of evaporation rate */
-        value->pheromone *= ANT_REMAINS_RATE;
-    }
-
-    return true;
-}
-
-static void _acs_iterating_update(AcoTable* table,
-                            AntObject *obj,
-                            int neigh_id,
-                            int nhops)
-{
-    if(obj->destination == PACKET_ID_INVALID ||
-       neigh_id == PACKET_ID_INVALID)
-    {
-        return;
-    }
-
-    if(ant_object_is_backtracked(obj))
-    {
-        return;
-    }
-
-    TableACSIteratorArgs args =
-                    {
-                    .neigh_id       = neigh_id,
-                    .global_min     = aco_table_min_hops(table, obj->source),
-                    .nhops          = nhops,
-                    };
-
-    // 모든 인접노드 링크에 대한 페로몬 농도를 갱신한다.
-    // 개미가 통과한 링크의 페로몬 농도는 증가 시키고
-    // 그 외의 링크의 페로몬 농도는 감소시킨다.
-    aco_table_iterate(table, obj->destination, (AcoTableIterator) __acs_pheromone_iterator, &args);
-
-    return;
-}
-
 static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
 {
     if(ant_object_is_visited(obj, neigh_id))
@@ -448,12 +368,33 @@ static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
         return;
     }
 
-    int nhops           = ant_object_nhops(obj) + 1;
+    AcoTableIter    s_iter          = {{0,}};
+    AcoTableIter    d_iter          = {{0,}};
+    AcoValue        *s_value        = NULL;
+    AcoValue        *d_value        = NULL;
+    int nhops                       = ant_object_nhops(obj) + 1;
+    int global_min                  = aco_table_min_hops(table, obj->destination)+1;
 
-    _acs_iterating_update(table,
-                      obj,
-                      neigh_id,
-                      nhops);
+    if(!aco_table_iter_begin(table, obj->source, &s_iter) ||
+       !aco_table_iter_begin(table, obj->destination, &d_iter))
+    {
+        return;
+    }
+
+    do
+    {
+        s_value = &s_iter.value;
+        d_value = &d_iter.value;
+
+        bool increase = d_value->neigh_id == neigh_id;
+        int local_min   = s_value->min_hops;
+
+        ant_colony_system_model(&d_value->pheromone, global_min, local_min, nhops, increase);
+
+        aco_table_set(table, d_value);
+    }
+    while(aco_table_iter_next(table, &s_iter) && aco_table_iter_next(table, &d_iter));
+
 }
 
 /*
