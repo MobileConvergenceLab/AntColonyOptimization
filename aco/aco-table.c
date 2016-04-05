@@ -19,7 +19,7 @@ typedef struct _RealValue {
     pheromone_t pheromone;
     int         tx_count;
     int         rx_count;
-    int         min_hops;
+    int         local_min;
 
     // Internal Variables
     int             row;        //< row index
@@ -35,7 +35,7 @@ typedef struct _RealTable {
     int                 ncol;
     int                 col_to_neigh[ACO_TABLE_MAX_COL + 1];
     int                 row_to_dest[ACO_TABLE_MAX_ROW + 1];
-    int                 min_hops[ACO_TABLE_MAX_ROW];
+    int                 global_min[ACO_TABLE_MAX_ROW];
     RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
 } RealTable;
 
@@ -50,7 +50,7 @@ void init_aco_value(RealValue *value, int target_id, int neigh_id, pheromone_t p
     value->pheromone        = pheromone;
     value->tx_count         = 0;
     value->rx_count         = 0;
-    value->min_hops         = ACO_TABLE_UNDEFINED_NHOPS,
+    value->local_min        = ACO_TABLE_UNDEFINED_NHOPS,
     value->row              = row;
     value->col              = col;
 }
@@ -79,9 +79,10 @@ static int _find_idx(int *array, int cap, int id)
 
 static void _set_value(RealTable* table, RealValue *value)
 {
-    int* min_hops = &table->min_hops[value->row];
-    value->pheromone = MIN(table->max, MAX(table->min, value->pheromone));
-    *min_hops = MIN(*min_hops, value->min_hops);
+    int* local_min = &table->global_min[value->row];
+
+    value->pheromone    = MIN(table->max, MAX(table->min, value->pheromone));
+    *local_min          = MIN(*local_min, value->local_min);
 }
 
 RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
@@ -115,7 +116,7 @@ AcoTable* aco_table_new(int host_id, pheromone_t min, pheromone_t max)
     table->ncol      = 0;
     _fill(table->col_to_neigh,   sizeof(table->col_to_neigh),     -1);
     _fill(table->row_to_dest,    sizeof(table->row_to_dest),      -1);
-    _fill(table->min_hops,       sizeof(table->min_hops),         ACO_TABLE_UNDEFINED_NHOPS);
+    _fill(table->global_min,       sizeof(table->global_min),         ACO_TABLE_UNDEFINED_NHOPS);
 
     return (AcoTable*)table;
 }
@@ -207,11 +208,11 @@ bool aco_table_add_col(AcoTable* ftable, int neigh_id)
     return true;
 }
 
-int aco_table_min_hops(AcoTable* ftable, int target_id)
+int aco_table_global_min(AcoTable* ftable, int target_id)
 {
     RealTable* table = (RealTable*)ftable;
 
-    int         min_hops    = ACO_TABLE_UNDEFINED_NHOPS;
+    int         global_min  = ACO_TABLE_UNDEFINED_NHOPS;
     int         ncol        = table->ncol;
     int         row         = _FIND_ROW(table, target_id);
     int         col;
@@ -223,17 +224,17 @@ int aco_table_min_hops(AcoTable* ftable, int target_id)
 
     if(aco_table_is_neigh(ftable, target_id))
     {
-        min_hops = 1;
+        global_min = 1;
         goto RETURN;
     }
 
     for(col=0; col< ncol; col++)
     {
-        min_hops = MIN(min_hops, table->array[row][col].min_hops);
+        global_min = MIN(global_min, table->array[row][col].local_min);
     }
 
 RETURN:
-    return min_hops;
+    return global_min;
 }
 
 bool aco_table_is_neigh(AcoTable* ftable, int id)
@@ -282,13 +283,13 @@ void aco_table_print_all(AcoTable* ftable)
         printf("<%3d>   ", table->row_to_dest[row]);
         for(int col=0; col<table->ncol; col++)
         {
-            int min_hops = table->array[row][col].min_hops;
-            min_hops = min_hops != ACO_TABLE_UNDEFINED_NHOPS ? min_hops : -1;
+            int local_min = table->array[row][col].local_min;
+            local_min = local_min != ACO_TABLE_UNDEFINED_NHOPS ? local_min : -1;
             printf("%05.2f %4d %4d  %2d   ",
                     table->array[row][col].pheromone,
                     table->array[row][col].tx_count,
                     table->array[row][col].rx_count,
-                    min_hops);
+                    local_min);
         }
         printf("\n");
     }
@@ -432,7 +433,7 @@ bool aco_table_tx_info_update(AcoTable* ftable, int target_id, int neigh_id)
 
     if(value != NULL)
     {
-        value->tx_count++;
+        value->tx_count += 1;;
         _set_value(table, value);
 
         return true;
@@ -451,8 +452,8 @@ bool aco_table_rx_info_update(AcoTable* ftable, int target_id, int neigh_id, int
     if(value != NULL)
     {
         // all these values are properly set in aco_table_set()
-        value->min_hops = nhops;
-        value->rx_count++;
+        value->local_min    = MIN(value->local_min, nhops);
+        value->rx_count     += 1;
         _set_value(table, value);
 
         return true;

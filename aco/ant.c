@@ -296,8 +296,8 @@ static void _pheromone_update(AcoTable* table,
 
     if(aco_table_get(table, &value))
     {
-        int local_min   = value.min_hops;
-        int global_min  = aco_table_min_hops(table, value.target_id);
+        int local_min   = value.local_min;
+        int global_min  = aco_table_global_min(table, value.target_id);
         model(&value.pheromone, global_min, local_min, nhops);
         aco_table_set(table, &value);
     }
@@ -366,7 +366,7 @@ static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
 
     if(aco_table_get(table, &value))
     {
-        int global_min  = aco_table_min_hops(table, obj->source)+1; 
+        int global_min  = aco_table_global_min(table, obj->source)+1; 
         int nhops       = ant_object_nhops(obj) + 1;
 
         ant_colony_system_model(&value.pheromone,

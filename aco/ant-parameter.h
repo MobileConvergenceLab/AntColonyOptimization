@@ -9,10 +9,10 @@
 #define     PHEROMONE_MAX               (99.9)
 
 
-// Dangling time for the send packet
+// time for the send packet
 #define     WAIT_REMAIN_PKT             (1000)
 
-#define     FORWARD_TARGET              (15)
+#define     FORWARD_TARGET              (4)
 #define     MONITOR_PERIOD_MS           (1000)
 
 #define     CYCLE_PERIOD_MS             (50)
@@ -38,6 +38,6 @@
 #error At least one flag must be set.
 #endif
 
-#define     ANT_BACKTRACK_UPDATE        (1)
+#define     ANT_BACKTRACK_UPDATE        (0)
 
 #endif

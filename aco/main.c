@@ -36,6 +36,7 @@ static void arg_hndler_table(MainObj *obj, int nhops);
 static void arg_hndler_allpair(MainObj *obj, int period);
 static void arg_hndler_oneway(MainObj *obj, int period);
 static void arg_hndler_monitor(MainObj *obj, bool flag);
+static void arg_hndler_logger(MainObj *obj, bool flag);
 static void opt_parser(
             int argc,
             char **argv,
@@ -43,7 +44,8 @@ static void opt_parser(
             int *table_value,
             int *flood_period,
             int *allpair_period,
-            bool *monitor_flag);
+            bool *monitor_flag,
+            bool *logger_flag);
 
 /**
  * Main Function
@@ -56,6 +58,7 @@ int main(int argc, char **argv) {
     int     flood_period        = 0;
     int     allpair_period      = 0;
     bool    monitor_flag        = false;
+    bool    logger_flag         = false;
 
     opt_parser(argc,
                 argv,
@@ -63,7 +66,8 @@ int main(int argc, char **argv) {
                 &table_value,
                 &flood_period,
                 &allpair_period,
-                &monitor_flag);
+                &monitor_flag,
+                &logger_flag);
 
     //g_print("Call init()\n");
     if(!init(obj, port))
@@ -72,12 +76,11 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    ant_callback_logger_set(logger);
-
     arg_hndler_table(obj, table_value);
     arg_hndler_allpair(obj, flood_period);
     arg_hndler_oneway(obj, allpair_period);
     arg_hndler_monitor(obj, monitor_flag);
+    arg_hndler_logger(obj, logger_flag);
 
     //g_print("Call Ready to run\n");
     g_main_loop_run(obj->loop);
@@ -391,12 +394,19 @@ static void arg_hndler_monitor(MainObj *obj, bool flag)
 {
     if(!flag) return;
 
-        //g_print("Call logging_timeout_add()\n");
-        if(!add_timeout_source(obj, (GSourceFunc)logging_timeout_event_hlder, MONITOR_PERIOD_MS))
-        {
-            perror("Call logging_timeout_add()");
-            exit(EXIT_FAILURE);
-        }
+    //g_print("Call logging_timeout_add()\n");
+    if(!add_timeout_source(obj, (GSourceFunc)logging_timeout_event_hlder, MONITOR_PERIOD_MS))
+    {
+        perror("Call logging_timeout_add()");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void arg_hndler_logger(MainObj *obj, bool flag)
+{
+    if(!flag) return;
+
+    ant_callback_logger_set(logger);
 }
 
 static void opt_parser(
@@ -406,7 +416,8 @@ static void opt_parser(
             int *table_value,
             int *flood_period,
             int *allpair_period,
-            bool *monitor_flag)
+            bool *monitor_flag,
+            bool *logger_flag)
 {
     int c;
     int exit_value = EXIT_SUCCESS;
@@ -432,6 +443,8 @@ static void opt_parser(
             case 'm':
                 *monitor_flag = true;
                 break;
+            case 'l':
+                *logger_flag = true;
             case '?':
                 if (optopt == 'p' || optopt == 't' || optopt == 'f' || optopt == 'a')
                     fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -454,6 +467,7 @@ static void opt_parser(
                         "   -a [milisecond]        activate the all-pair routing policy(oneway packet)\n"
                         "                          to update the pheromone table with the given period\n"
                         "   -m                     activate table monitoring\n"
+                        "   -l                     activate custom logger\n"
                         "   -h                     print this menu and exit\n",
                         argv[0]);
                 exit(exit_value);

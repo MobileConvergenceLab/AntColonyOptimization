@@ -12,7 +12,7 @@ typedef struct _AcoValue {
     pheromone_t pheromone;
     int         tx_count;       // 해당 인접노드로 패킷을 보낸 개수
     int         rx_count;       // 해당 인접노드에서 패킷을 수신한 개수
-    int         min_hops;       // 해당 노드까지의 최소 거리
+    int         local_min;      // 해당 노드까지의 최소 거리
 } AcoValue;
 
 typedef struct _AcoTableIter {
@@ -43,7 +43,7 @@ bool aco_table_iter_next            (AcoTable* table, AcoTableIter *iter);
 int* aco_table_new_neighs           (AcoTable* table);
 int* aco_table_new_dests            (AcoTable* table);
 void aco_table_free_array           (int *array);
-int aco_table_min_hops              (AcoTable* table, int target_id);
+int aco_table_global_min            (AcoTable* table, int target_id);
 bool aco_table_tx_info_update       (AcoTable* table, int target_id, int neigh_id);
 bool aco_table_rx_info_update       (AcoTable* table, int target_id, int neigh_id, int nhops);
 
