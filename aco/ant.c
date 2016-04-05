@@ -45,7 +45,7 @@ static int _unicast_backward        (AcoTable* table, AntObject* obj);
 static void _register_on_table      (AcoTable* table, AntObject* obj);
 static void _update_statistics      (AcoTable* table, AntObject* obj);
 static void _forward_ant            (Ant* fant);
-static void _iterating_update       (AcoTable* table, AntObject* obj, int target_id, int neigh_id, int nhops, AntModel model);
+static void _pheromone_update       (AcoTable* table, AntObject* obj, int target_id, int neigh_id, int nhops, AntModel model);
 static bool _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
 static void _destination_update     (AcoTable* table, AntObject* obj, int neigh_id, AntModel model);
@@ -285,7 +285,7 @@ static bool _backtrack_update(AcoTable* table, AntObject* obj)
     return false;
 }
 
-static void _iterating_update(AcoTable* table,
+static void _pheromone_update(AcoTable* table,
                             AntObject *obj,
                             int target_id,
                             int neigh_id,
@@ -308,45 +308,9 @@ static void _iterating_update(AcoTable* table,
     {
         int local_min   = value.min_hops;
         int global_min  = aco_table_min_hops(table, value.target_id);
-        model(&value.pheromone, global_min, local_min, nhops, true);
+        model(&value.pheromone, global_min, local_min, nhops);
         aco_table_set(table, &value);
     }
-
-    return;
-}
-
-static void _iterating_update2(AcoTable* table,
-                            AntObject *obj,
-                            int target_id,
-                            int neigh_id,
-                            int nhops,
-                            AntModel model)
-{
-    if(target_id == PACKET_ID_INVALID ||
-       neigh_id == PACKET_ID_INVALID)
-    {
-        return;
-    }
-
-    AcoTableIter    iter            = {{0,}};
-
-    if(!aco_table_iter_begin(table, target_id, &iter))
-    {
-        return;
-    }
-
-    do
-    {
-        AcoValue *value = &iter.value;
-        bool increase   = value->neigh_id == neigh_id;
-        int local_min   = value->min_hops;
-        int global_min  = aco_table_min_hops(table, value->target_id);
-
-        model(&value->pheromone, global_min, local_min, nhops, increase);
-
-        aco_table_set(table, value);
-    }
-    while(aco_table_iter_next(table, &iter));
 
     return;
 }
@@ -365,7 +329,7 @@ static void _source_update(AcoTable* table, AntObject* obj, AntModel model)
     int target          = obj->source;
     int nhops           = ant_object_nhops(obj);
 
-    _iterating_update(table,
+    _pheromone_update(table,
                       obj,
                       target,
                       neigh_id,
@@ -383,7 +347,7 @@ static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, A
     int target          = obj->destination;
     int nhops           = ant_object_nhops(obj) + 1;
 
-    _iterating_update(table,
+    _pheromone_update(table,
                       obj,
                       target,
                       neigh_id,
@@ -398,33 +362,33 @@ static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
         return;
     }
 
-    AcoTableIter    s_iter          = {{0,}};
-    AcoTableIter    d_iter          = {{0,}};
-    AcoValue        *s_value        = NULL;
-    AcoValue        *d_value        = NULL;
-    int nhops                       = ant_object_nhops(obj) + 1;
-    int global_min                  = aco_table_min_hops(table, obj->destination)+1;
+    int target_id = obj->destination;
 
-    if(!aco_table_iter_begin(table, obj->source, &s_iter) ||
-       !aco_table_iter_begin(table, obj->destination, &d_iter))
+    if(target_id == PACKET_ID_INVALID ||
+       neigh_id == PACKET_ID_INVALID)
     {
         return;
     }
 
-    do
+    AcoValue value =
+        {
+            .target_id = target_id,
+            .neigh_id = neigh_id,
+        };
+
+    if(aco_table_get(table, &value))
     {
-        s_value = &s_iter.value;
-        d_value = &d_iter.value;
+        int global_min  = aco_table_min_hops(table, obj->source)+1; 
+        int nhops       = ant_object_nhops(obj) + 1;
 
-        bool increase = d_value->neigh_id == neigh_id;
-        int local_min   = s_value->min_hops;
-
-        ant_colony_system_model(&d_value->pheromone, global_min, local_min, nhops, increase);
-
-        aco_table_set(table, d_value);
+        ant_colony_system_model(&value.pheromone,
+                                global_min,
+                                -1/*noused in ACS model*/,
+                                nhops);
+        aco_table_set(table, &value);
     }
-    while(aco_table_iter_next(table, &s_iter) && aco_table_iter_next(table, &d_iter));
 
+    return;
 }
 
 /*

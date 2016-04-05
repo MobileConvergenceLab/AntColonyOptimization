@@ -16,8 +16,8 @@
 #define     MONITOR_PERIOD_MS           (1000)
 
 #define     CYCLE_PERIOD_MS             (50)
-#define     NUMBER_OF_CYCLES            (100)
-#define     PACKETS_PER_CYCLE           (10)
+#define     NUMBER_OF_CYCLES            (200)
+#define     PACKETS_PER_CYCLE           (20)
 
 // The maximum value is Depend on MTU.
 #define     ANT_MAXIMUM_TTL             (128)
@@ -27,7 +27,7 @@
 #define     ANT_REMAINS_RATE            (1-ANT_EVAPORATION_RATE)
 #define     ANT_COCENTRATION_CONST      (PHEROMONE_MAX*ANT_EVAPORATION_RATE/(double)PACKETS_PER_CYCLE)
 
-#define     ANT_MODEL_SELECTOR          (ant_normalizing_model)
+#define     ANT_MODEL_SELECTOR          (ant_colony_system_model)
 
 // Flgas
 #define     ANT_DESTINATION_UPDATE      (0)

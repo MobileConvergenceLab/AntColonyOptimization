@@ -27,8 +27,6 @@ typedef struct _AcoTable {
     char                data[];
 } AcoTable;
 
-typedef bool (*AcoTableIterator)(AcoTable* table, AcoValue *value, void *userdata);
-
 AcoTable* aco_table_new             (int host_id, pheromone_t min, pheromone_t max);
 AcoTable* aco_table_ref             (AcoTable* table);
 void aco_table_unref                (AcoTable* table);
@@ -39,8 +37,7 @@ bool aco_table_is_neigh             (AcoTable* table, int id);
 void aco_table_print_all            (AcoTable* table);
 bool aco_table_get                  (AcoTable* table, AcoValue *value);
 bool aco_table_set                  (AcoTable* table, const AcoValue *value);
-void aco_table_iterate_all          (AcoTable* table, AcoTableIterator updater, void *userdata);
-void aco_table_iterate              (AcoTable* table, int target_id, AcoTableIterator iterator, void *user);
+void aco_table_evaporate_all        (AcoTable* table, pheromone_t remain_rate);
 bool aco_table_iter_begin           (AcoTable* table, int target_id, AcoTableIter *iter);
 bool aco_table_iter_next            (AcoTable* table, AcoTableIter *iter);
 int* aco_table_new_neighs           (AcoTable* table);

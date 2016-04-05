@@ -316,39 +316,16 @@ bool aco_table_set(AcoTable* ftable, const AcoValue *value)
     return true;
 }
 
-void aco_table_iterate_all(AcoTable* ftable, AcoTableIterator updater, void *userdata)
+void aco_table_evaporate_all(AcoTable* ftable, pheromone_t remain_rate)
 {
     RealTable* table = (RealTable*)ftable;
 
-    bool ret;
     for(int row=0; row<table->nrow; row++)
     {
         for(int col=0; col<table->ncol; col++)
         {
-            ret = updater(ftable, &table->array[row][col].value, userdata);
-            _set_value(table, table->array[row]+col);
-            if(!ret) return;
+            table->array[row][col].value.pheromone *= remain_rate;
         }
-    }
-}
-
-void aco_table_iterate(AcoTable* ftable, int target_id, AcoTableIterator updater, void *userdata)
-{
-    RealTable* table = (RealTable*)ftable;
-
-    int row = _FIND_ROW(table, target_id);
-    bool ret;
-
-    if(row == -1)
-    {
-        return;
-    }
-
-    for(int col=0; col<table->ncol; col++)
-    {
-        ret = updater(ftable, &table->array[row][col].value, userdata);
-        _set_value(table, table->array[row]+col);
-        if(!ret) return;
     }
 }
 

@@ -284,16 +284,9 @@ static gboolean logging_timeout_event_hlder(MainObj *obj)
     return TRUE;
 }
 
-static bool __table_decrease_iterator(AcoTable *table, AcoValue *value, void *noused)
-{
-    value->pheromone *= ANT_REMAINS_RATE;
-
-    return TRUE;
-}
-
 static gboolean table_update_timeout_event_hlder(MainObj *obj)
 {
-    aco_table_iterate_all(obj->table, __table_decrease_iterator, NULL);
+    aco_table_evaporate_all(obj->table, ANT_REMAINS_RATE);
 
     return TRUE;
 }
