@@ -241,7 +241,7 @@ static void _register_on_table(AcoTable* table, AntObject* obj)
 
     /* ant의 생성지를 보고 등록 안되어 있으면 적절하게 등록한다. */
     /* source != host_id: 백트래킹한 패킷이다. 자기자신은 테이블에 추가해서는 안된다.*/
-    if(!aco_table_is_dest(table, source) &&
+    if(!aco_table_is_target(table, source) &&
        !aco_table_is_neigh(table, source) && 
         source != host_id) 
     {

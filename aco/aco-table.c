@@ -250,7 +250,7 @@ bool aco_table_is_neigh(AcoTable* ftable, int id)
     return true;
 }
 
-bool aco_table_is_dest(AcoTable* ftable, int id)
+bool aco_table_is_target(AcoTable* ftable, int id)
 {
     RealTable* table = (RealTable*)ftable;
 

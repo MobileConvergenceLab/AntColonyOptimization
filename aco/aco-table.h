@@ -32,7 +32,7 @@ AcoTable* aco_table_ref             (AcoTable* table);
 void aco_table_unref                (AcoTable* table);
 bool aco_table_add_row              (AcoTable* table, int target_id);
 bool aco_table_add_col              (AcoTable* table, int neigh_id);
-bool aco_table_is_dest              (AcoTable* table, int id);
+bool aco_table_is_target            (AcoTable* table, int id);
 bool aco_table_is_neigh             (AcoTable* table, int id);
 void aco_table_print_all            (AcoTable* table);
 bool aco_table_get                  (AcoTable* table, AcoValue *value);
