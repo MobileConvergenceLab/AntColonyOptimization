@@ -45,8 +45,8 @@ static int _unicast_backward        (AcoTable* table, AntObject* obj);
 static void _register_on_table      (AcoTable* table, AntObject* obj);
 static void _update_statistics      (AcoTable* table, AntObject* obj);
 static void _forward_ant            (Ant* fant);
-static void _pheromone_update       (AcoTable* table, AntObject* obj, int target_id, int neigh_id, int nhops, AntModel model);
-static bool _backtrack_update       (AcoTable* table, AntObject* obj);
+static void _pheromone_update       (AcoTable* table, int target_id, int neigh_id, int nhops, AntModel model);
+static void _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
 static void _destination_update     (AcoTable* table, AntObject* obj, int neigh_id, AntModel model);
 static int _select_neighbor         (AcoTable* table, AntObject* obj);
@@ -101,18 +101,28 @@ void ant_send(Ant* fant)
 void ant_callback(Ant* fant)
 {
     RealAnt* ant = (RealAnt*)fant;
+    AcoTable* table = ant->table;
+    AntObject* obj = ant->obj;
 
     /* 패킷을 수신했을 때 호출되는 루틴이다. */
 
     // 패킷을 수신했는데 목적지 등록안된 새로운 것이라면 테이블에 추가한다.
-    _register_on_table(ant->table, ant->obj);
+    _register_on_table(table, obj);
 
-    // update statistics info
-    _update_statistics(ant->table, ant->obj);
-
-    #if ANT_BACKTRACK_UPDATE
-    _backtrack_update(ant->table, ant->obj);
-    #endif
+    if(ant_object_is_backtracked(obj))
+    {
+        #if ANT_BACKTRACK_UPDATE
+        _backtrack_update(ant->table, ant->obj);
+        #endif
+    }
+    else
+    {
+        // update statistics info
+        aco_table_rx_info_update(table,
+                        obj->source,
+                        ant_object_previous(obj),
+                        ant_object_nhops(obj));
+    }
 
     // enabled by ant_callback_logger_set() method.
     if(STATIC_LOGGER != NULL)
@@ -195,16 +205,10 @@ static void _unicast_pkt(AcoTable* table, AntObject* obj, int rid)
 
     int         tid     = table->host_id;
     packet      pkt     = {{0,}};
-    AcoValue    value   = {0,};
 
-    // increase tx_count
-    value.target_id = obj->destination;
-    value.neigh_id = rid;
-    if(aco_table_get(table, &value))
-    {
-        value.tx_count++;
-        aco_table_set(table, &value);
-    }
+    aco_table_tx_info_update(table,
+                        obj->destination,
+                        rid);
 
     // 마지막으로 패킷을 송신한다.
     _make_pkt(obj, &pkt, tid, rid);
@@ -253,40 +257,27 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
         return;
     }
 
-    AcoValue value  = {0,};
+    aco_table_rx_info_update(table,
+                    obj->source,
+                    ant_object_previous(obj),
+                    ant_object_nhops(obj));
+}
 
-    value.target_id   = obj->source;
-    value.neigh_id  = ant_object_previous(obj);
-
-    aco_table_get(table, &value);
+static void _backtrack_update(AcoTable* table, AntObject* obj)
+{
+    int id = ant_object_from(obj);
+    AcoValue value = {
+        .target_id = obj->destination,
+        .neigh_id = id};
 
     if(aco_table_get(table, &value))
     {
-        value.min_hops = ant_object_nhops(obj);
-
-        value.rx_count++;
-        aco_table_set(table, &value);
-    }
-}
-
-static bool _backtrack_update(AcoTable* table, AntObject* obj)
-{
-    if(ant_object_is_backtracked(obj))
-    {
-        int id = ant_object_from(obj);
-        AcoValue value = {.target_id = obj->destination, .neigh_id = id};
-        aco_table_get(table, &value);
         value.pheromone = 0;
         aco_table_set(table, &value);
-
-        return true;
     }
-
-    return false;
 }
 
 static void _pheromone_update(AcoTable* table,
-                            AntObject *obj,
                             int target_id,
                             int neigh_id,
                             int nhops,
@@ -298,8 +289,7 @@ static void _pheromone_update(AcoTable* table,
         return;
     }
 
-    AcoValue value =
-        {
+    AcoValue value = {
             .target_id = target_id,
             .neigh_id = neigh_id,
         };
@@ -330,7 +320,6 @@ static void _source_update(AcoTable* table, AntObject* obj, AntModel model)
     int nhops           = ant_object_nhops(obj);
 
     _pheromone_update(table,
-                      obj,
                       target,
                       neigh_id,
                       nhops,
@@ -348,7 +337,6 @@ static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, A
     int nhops           = ant_object_nhops(obj) + 1;
 
     _pheromone_update(table,
-                      obj,
                       target,
                       neigh_id,
                       nhops,

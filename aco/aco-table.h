@@ -44,5 +44,7 @@ int* aco_table_new_neighs           (AcoTable* table);
 int* aco_table_new_dests            (AcoTable* table);
 void aco_table_free_array           (int *array);
 int aco_table_min_hops              (AcoTable* table, int target_id);
+bool aco_table_tx_info_update       (AcoTable* table, int target_id, int neigh_id);
+bool aco_table_rx_info_update       (AcoTable* table, int target_id, int neigh_id, int nhops);
 
 #endif /* AcoTable_H */

@@ -16,8 +16,8 @@
 #define     MONITOR_PERIOD_MS           (1000)
 
 #define     CYCLE_PERIOD_MS             (50)
-#define     NUMBER_OF_CYCLES            (200)
-#define     PACKETS_PER_CYCLE           (20)
+#define     NUMBER_OF_CYCLES            (100)
+#define     PACKETS_PER_CYCLE           (10)
 
 // The maximum value is Depend on MTU.
 #define     ANT_MAXIMUM_TTL             (128)
@@ -38,6 +38,6 @@
 #error At least one flag must be set.
 #endif
 
-#define     ANT_BACKTRACK_UPDATE        (0)
+#define     ANT_BACKTRACK_UPDATE        (1)
 
 #endif

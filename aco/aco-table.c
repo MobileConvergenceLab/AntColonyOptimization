@@ -409,3 +409,45 @@ void aco_table_free_array(int *array)
     return;
 }
 
+bool aco_table_tx_info_update(AcoTable* table, int target_id, int neigh_id)
+{
+    AcoValue value  = {
+        .target_id = target_id,
+        .neigh_id = neigh_id,
+        };
+
+    if(aco_table_get(table, &value))
+    {
+        value.tx_count++;
+        aco_table_set(table, &value);
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool aco_table_rx_info_update(AcoTable* table, int target_id, int neigh_id, int nhops)
+{
+
+    AcoValue value  = {
+        .target_id = target_id,
+        .neigh_id = neigh_id,
+        };
+
+    if(aco_table_get(table, &value))
+    {
+        // all these values are properly set in aco_table_set()
+        value.min_hops = nhops;
+        value.rx_count++;
+        aco_table_set(table, &value);
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
