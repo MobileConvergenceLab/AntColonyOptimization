@@ -13,11 +13,18 @@
  * Private Type Declarations
  *==============================================================================*/
 // Internal AcoValue
-typedef struct _IAcoValue {
-    AcoValue        value;
+typedef struct _RealValue {
+    int         target_id;
+    int         neigh_id;
+    pheromone_t pheromone;
+    int         tx_count;
+    int         rx_count;
+    int         min_hops;
+
+    // Internal Variables
     int             row;        //< row index
     int             col;        //< col index
-} IAcoValue;
+} RealValue;
 
 typedef struct _RealTable {
     const int           host_id;
@@ -29,25 +36,25 @@ typedef struct _RealTable {
     int                 col_to_neigh[ACO_TABLE_MAX_COL + 1];
     int                 row_to_dest[ACO_TABLE_MAX_ROW + 1];
     int                 min_hops[ACO_TABLE_MAX_ROW];
-    IAcoValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
+    RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
 } RealTable;
-
-/*==============================================================================
- * Private Data
- *==============================================================================*/
-static const AcoValue DEFAULT_ACO_VALUE =
-{
-    .target_id    = -1,
-    .neigh_id   = -1,
-    .tx_count   = 0,
-    .rx_count   = 0,
-    .min_hops   = ACO_TABLE_UNDEFINED_NHOPS,
-    .pheromone  = 0
-};
 
 /*==============================================================================
  * Private Function Implemenations
  *==============================================================================*/
+
+void init_aco_value(RealValue *value, int target_id, int neigh_id, pheromone_t pheromone, int row, int col)
+{
+    value->target_id        = target_id;
+    value->neigh_id         = neigh_id;
+    value->pheromone        = pheromone;
+    value->tx_count         = 0;
+    value->rx_count         = 0;
+    value->min_hops         = ACO_TABLE_UNDEFINED_NHOPS,
+    value->row              = row;
+    value->col              = col;
+}
+
 
 static void _fill(int *array, int cap, int value)
 {
@@ -70,11 +77,26 @@ static int _find_idx(int *array, int cap, int id)
 #define _FIND_COL(table, id)    _find_idx(table->col_to_neigh, ACO_TABLE_MAX_COL, id)
 #define _FIND_ROW(table, id)    _find_idx(table->row_to_dest, ACO_TABLE_MAX_ROW, id)
 
-static void _set_value(RealTable* table, IAcoValue *ivalue)
+static void _set_value(RealTable* table, RealValue *value)
 {
-    int* min_hops = &table->min_hops[ivalue->row];
-    ivalue->value.pheromone = MIN(table->max, MAX(table->min, ivalue->value.pheromone));
-    *min_hops = MIN(*min_hops, ivalue->value.min_hops);
+    int* min_hops = &table->min_hops[value->row];
+    value->pheromone = MIN(table->max, MAX(table->min, value->pheromone));
+    *min_hops = MIN(*min_hops, value->min_hops);
+}
+
+RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
+{
+    int row = _FIND_ROW(table, target_id);
+    int col = _FIND_COL(table, neigh_id);
+
+    if(row == -1 || col == -1)
+    {
+        return NULL;
+    }
+    else
+    {
+        return &table->array[row][col];
+    }
 }
 
 /*==============================================================================
@@ -140,12 +162,12 @@ bool aco_table_add_row(AcoTable* ftable, int target_id)
 
     for(int col=0; col<table->ncol; col++)
     {
-        table->array[row][col].value             = DEFAULT_ACO_VALUE;
-        table->array[row][col].value.target_id   = target_id;
-        table->array[row][col].value.neigh_id    = table->col_to_neigh[col];
-        table->array[row][col].value.pheromone   = table->min;
-        table->array[row][col].row               = row;
-        table->array[row][col].col               = col;
+        init_aco_value(&table->array[row][col],
+                target_id,
+                table->col_to_neigh[col],
+                table->min,
+                row,
+                col);
     }
 
     return true;
@@ -174,12 +196,12 @@ bool aco_table_add_col(AcoTable* ftable, int neigh_id)
 
     for(int row=0; row<table->nrow; row++)
     {
-        table->array[row][col].value           = DEFAULT_ACO_VALUE;
-        table->array[row][col].value.target_id   = table->row_to_dest[row];
-        table->array[row][col].value.neigh_id  = neigh_id;
-        table->array[row][col].value.pheromone = table->min;
-        table->array[row][col].row             = row;
-        table->array[row][col].col             = col;
+        init_aco_value(&table->array[row][col],
+                table->row_to_dest[row],
+                neigh_id,
+                table->min,
+                row,
+                col);
     }
 
     return true;
@@ -192,32 +214,25 @@ int aco_table_min_hops(AcoTable* ftable, int target_id)
     int         min_hops    = ACO_TABLE_UNDEFINED_NHOPS;
     int         ncol        = table->ncol;
     int         row         = _FIND_ROW(table, target_id);
-    int         hops;
     int         col;
-    AcoValue*   value;
 
     if(row == -1)
     {
-        return ACO_TABLE_UNDEFINED_NHOPS;
+        goto RETURN;
     }
 
     if(aco_table_is_neigh(ftable, target_id))
     {
-        return 1;
+        min_hops = 1;
+        goto RETURN;
     }
 
     for(col=0; col< ncol; col++)
     {
-        value = &table->array[row][col].value;
-
-        hops = value->min_hops;
-        
-        if(min_hops > hops)
-        {
-            min_hops = hops;
-        }
+        min_hops = MIN(min_hops, table->array[row][col].min_hops);
     }
 
+RETURN:
     return min_hops;
 }
 
@@ -267,12 +282,12 @@ void aco_table_print_all(AcoTable* ftable)
         printf("<%3d>   ", table->row_to_dest[row]);
         for(int col=0; col<table->ncol; col++)
         {
-            int min_hops = table->array[row][col].value.min_hops;
+            int min_hops = table->array[row][col].min_hops;
             min_hops = min_hops != ACO_TABLE_UNDEFINED_NHOPS ? min_hops : -1;
             printf("%05.2f %4d %4d  %2d   ",
-                    table->array[row][col].value.pheromone,
-                    table->array[row][col].value.tx_count,
-                    table->array[row][col].value.rx_count,
+                    table->array[row][col].pheromone,
+                    table->array[row][col].tx_count,
+                    table->array[row][col].rx_count,
                     min_hops);
         }
         printf("\n");
@@ -280,38 +295,39 @@ void aco_table_print_all(AcoTable* ftable)
     printf("\n");
 }
 
-bool aco_table_get(AcoTable* ftable, AcoValue *value)
+bool aco_table_get(AcoTable* ftable, AcoValue *fvalue)
 {
     RealTable* table = (RealTable*)ftable;
+    RealValue* value = _get_value(table, fvalue->target_id, fvalue->neigh_id);
 
-    int row = _FIND_ROW(table, value->target_id);
-    int col = _FIND_COL(table, value->neigh_id);
-
-    if(row == -1 || col == -1)
+    if(value == NULL)
     {
         return false;
     }
+    else
+    {
+        *fvalue = *(AcoValue*)value;
 
-    *value = table->array[row][col].value;
+        return true;
+    }
 
-    return true;
 }
 
-bool aco_table_set(AcoTable* ftable, const AcoValue *value)
+bool aco_table_set(AcoTable* ftable, const AcoValue *fvalue)
 {
     RealTable* table = (RealTable*)ftable;
+    RealValue* value = _get_value(table, fvalue->target_id, fvalue->neigh_id);
 
-    int row = _FIND_ROW(table, value->target_id);
-    int col = _FIND_COL(table, value->neigh_id);
-
-    if(row == -1 || col == -1)
+    if(value == NULL)
     {
         return false;
     }
-
-    // Pheromone
-    table->array[row][col].value = *value;
-    _set_value(table, table->array[row]+col);
+    else
+    {
+        // Pheromone
+        *(AcoValue*)value = *fvalue;
+        _set_value(table, value);
+    }
 
     return true;
 }
@@ -324,7 +340,7 @@ void aco_table_evaporate_all(AcoTable* ftable, pheromone_t remain_rate)
     {
         for(int col=0; col<table->ncol; col++)
         {
-            table->array[row][col].value.pheromone *= remain_rate;
+            table->array[row][col].pheromone *= remain_rate;
         }
     }
 }
@@ -345,7 +361,7 @@ bool aco_table_iter_begin(AcoTable* ftable, int target_id, AcoTableIter *iter)
         return false;
     }
 
-    iter->value = table->array[row][0].value;
+    iter->value = *(AcoValue*)&table->array[row][0];
     iter->index = 0;
 
     return true;
@@ -372,7 +388,7 @@ bool aco_table_iter_next(AcoTable* ftable, AcoTableIter *iter)
     }
 
     index++;
-    iter->value = table->array[row][index].value;
+    iter->value = *(AcoValue*)&table->array[row][index];
     iter->index = index;
 
     return true;
@@ -409,17 +425,15 @@ void aco_table_free_array(int *array)
     return;
 }
 
-bool aco_table_tx_info_update(AcoTable* table, int target_id, int neigh_id)
+bool aco_table_tx_info_update(AcoTable* ftable, int target_id, int neigh_id)
 {
-    AcoValue value  = {
-        .target_id = target_id,
-        .neigh_id = neigh_id,
-        };
+    RealTable* table = (RealTable*)ftable;
+    RealValue* value = _get_value(table, target_id, neigh_id);
 
-    if(aco_table_get(table, &value))
+    if(value != NULL)
     {
-        value.tx_count++;
-        aco_table_set(table, &value);
+        value->tx_count++;
+        _set_value(table, value);
 
         return true;
     }
@@ -429,20 +443,17 @@ bool aco_table_tx_info_update(AcoTable* table, int target_id, int neigh_id)
     }
 }
 
-bool aco_table_rx_info_update(AcoTable* table, int target_id, int neigh_id, int nhops)
+bool aco_table_rx_info_update(AcoTable* ftable, int target_id, int neigh_id, int nhops)
 {
+    RealTable* table = (RealTable*)ftable;
+    RealValue* value = _get_value(table, target_id, neigh_id);
 
-    AcoValue value  = {
-        .target_id = target_id,
-        .neigh_id = neigh_id,
-        };
-
-    if(aco_table_get(table, &value))
+    if(value != NULL)
     {
         // all these values are properly set in aco_table_set()
-        value.min_hops = nhops;
-        value.rx_count++;
-        aco_table_set(table, &value);
+        value->min_hops = nhops;
+        value->rx_count++;
+        _set_value(table, value);
 
         return true;
     }
