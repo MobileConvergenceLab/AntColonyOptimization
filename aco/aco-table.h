@@ -12,6 +12,7 @@ typedef struct _AcoValue {
     pheromone_t pheromone;
     int         tx_count;       // 해당 인접노드로 패킷을 보낸 개수
     int         rx_count;       // 해당 인접노드에서 패킷을 수신한 개수
+    int         dead_count;
     int         local_min;      // 해당 노드까지의 최소 거리
 } AcoValue;
 
@@ -24,10 +25,13 @@ typedef struct _AcoTable {
     const int           host_id;
     const pheromone_t   min;
     const pheromone_t   max;
-    char                data[];
+    const int           max_endurance;
+
+    // For internal Varialbles
+    const char          data[];
 } AcoTable;
 
-AcoTable* aco_table_new             (int host_id, pheromone_t min, pheromone_t max);
+AcoTable* aco_table_new             (int host_id, pheromone_t min, pheromone_t max, int max_endurance);
 AcoTable* aco_table_ref             (AcoTable* table);
 void aco_table_unref                (AcoTable* table);
 bool aco_table_add_row              (AcoTable* table, int target_id);

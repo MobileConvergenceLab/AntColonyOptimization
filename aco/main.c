@@ -156,7 +156,7 @@ static gboolean init(MainObj *obj, int port) {
         exit(EXIT_FAILURE);
     }
 
-    obj->table      = aco_table_new(host_id, PHEROMONE_MIN, PHEROMONE_MAX);
+    obj->table      = aco_table_new(host_id, PHEROMONE_MIN, PHEROMONE_MAX, ENDURANCE_MAX);
 
     //g_print("Call table_init_from_daemon()\n");
     if(!table_init_from_daemon(obj->table))

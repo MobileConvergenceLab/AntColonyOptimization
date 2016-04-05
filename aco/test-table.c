@@ -6,7 +6,8 @@ AcoTable* test_new()
     AcoTable* table = aco_table_new(
             10,     // host id
             0,      // min pheromone
-            100);   // max pheromone
+            100,    // max pheromone
+            30);    // max endurance
 
     aco_table_add_col(table, 0);
     aco_table_add_col(table, 1);

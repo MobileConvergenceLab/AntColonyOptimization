@@ -14,22 +14,29 @@
  *==============================================================================*/
 // Internal AcoValue
 typedef struct _RealValue {
+    // These members must be aligned in the same order in AcoValue.
     int         target_id;
     int         neigh_id;
     pheromone_t pheromone;
     int         tx_count;
     int         rx_count;
+    int         dead_count;
     int         local_min;
 
     // Internal Variables
     int             row;        //< row index
     int             col;        //< col index
+    int             endurance;
 } RealValue;
 
 typedef struct _RealTable {
+    // These members must be aligned in the same order in AcoTable.
     const int           host_id;
     const pheromone_t   min;
     const pheromone_t   max;
+    const int           max_endurance;
+
+    // Internal Variables
     int                 ref_count;
     int                 nrow;
     int                 ncol;
@@ -43,16 +50,19 @@ typedef struct _RealTable {
  * Private Function Implemenations
  *==============================================================================*/
 
-void init_aco_value(RealValue *value, int target_id, int neigh_id, pheromone_t pheromone, int row, int col)
+static inline void init_aco_value(RealValue *value, int target_id, int neigh_id, pheromone_t pheromone, int row, int col, int max_endurance)
 {
     value->target_id        = target_id;
     value->neigh_id         = neigh_id;
     value->pheromone        = pheromone;
     value->tx_count         = 0;
     value->rx_count         = 0;
+    value->dead_count       = 0;
+
     value->local_min        = ACO_TABLE_UNDEFINED_NHOPS,
     value->row              = row;
     value->col              = col;
+    value->endurance        = max_endurance;
 }
 
 
@@ -77,15 +87,16 @@ static int _find_idx(int *array, int cap, int id)
 #define _FIND_COL(table, id)    _find_idx(table->col_to_neigh, ACO_TABLE_MAX_COL, id)
 #define _FIND_ROW(table, id)    _find_idx(table->row_to_dest, ACO_TABLE_MAX_ROW, id)
 
-static void _set_value(RealTable* table, RealValue *value)
+static inline void _set_value(RealTable* table, RealValue *value)
 {
     int* local_min = &table->global_min[value->row];
 
     value->pheromone    = MIN(table->max, MAX(table->min, value->pheromone));
     *local_min          = MIN(*local_min, value->local_min);
+    value->endurance    = MAX(value->endurance, 0);
 }
 
-RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
+static RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
 {
     int row = _FIND_ROW(table, target_id);
     int col = _FIND_COL(table, neigh_id);
@@ -103,13 +114,14 @@ RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
 /*==============================================================================
  * Public Function Implemenations
  *==============================================================================*/
-AcoTable* aco_table_new(int host_id, pheromone_t min, pheromone_t max)
+AcoTable* aco_table_new(int host_id, pheromone_t min, pheromone_t max, int max_endurance)
 {
     RealTable* table = malloc(sizeof(RealTable));
 
     *(int*)&table->host_id      = host_id;
     *(pheromone_t*)&table->min  = min;
     *(pheromone_t*)&table->max  = max;
+    *(int*)&table->max_endurance= max_endurance;
 
     table->ref_count = 1;
     table->nrow      = 0;
@@ -168,7 +180,8 @@ bool aco_table_add_row(AcoTable* ftable, int target_id)
                 table->col_to_neigh[col],
                 table->min,
                 row,
-                col);
+                col,
+                table->max_endurance);
     }
 
     return true;
@@ -202,7 +215,8 @@ bool aco_table_add_col(AcoTable* ftable, int neigh_id)
                 neigh_id,
                 table->min,
                 row,
-                col);
+                col,
+                table->max_endurance);
     }
 
     return true;
@@ -336,12 +350,34 @@ bool aco_table_set(AcoTable* ftable, const AcoValue *fvalue)
 void aco_table_evaporate_all(AcoTable* ftable, pheromone_t remain_rate)
 {
     RealTable* table = (RealTable*)ftable;
+    RealValue* value = NULL;
 
     for(int row=0; row<table->nrow; row++)
     {
         for(int col=0; col<table->ncol; col++)
         {
-            table->array[row][col].pheromone *= remain_rate;
+            value = &table->array[row][col];
+
+            if(value->endurance == 0)
+            {
+                // Clear all column in given row.
+
+                for(int col=0; col<table->ncol; col++)
+                {
+                    value = &table->array[row][col];
+                    value->pheromone        = table->min;
+                    value->tx_count         = 0;
+                    value->rx_count         = 0;
+                    value->dead_count       += 1;
+                    value->local_min        = ACO_TABLE_UNDEFINED_NHOPS;
+                    value->endurance        = table->max_endurance;
+                }
+                break;
+            }
+            else
+            {
+                value->pheromone = MAX(value->pheromone*remain_rate, table->min);
+            }
         }
     }
 }
@@ -433,7 +469,8 @@ bool aco_table_tx_info_update(AcoTable* ftable, int target_id, int neigh_id)
 
     if(value != NULL)
     {
-        value->tx_count += 1;;
+        value->tx_count     += 1;
+        value->endurance    -= 1;
         _set_value(table, value);
 
         return true;
@@ -454,6 +491,7 @@ bool aco_table_rx_info_update(AcoTable* ftable, int target_id, int neigh_id, int
         // all these values are properly set in aco_table_set()
         value->local_min    = MIN(value->local_min, nhops);
         value->rx_count     += 1;
+        value->endurance    = table->max_endurance;
         _set_value(table, value);
 
         return true;
