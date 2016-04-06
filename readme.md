@@ -23,6 +23,9 @@ Required:
 * numpy (for plot)
 * matplotlib.pyplot (for plot)
 
+# FON
+This section will be updated.
+
 # Ant Colony Optimization Routing Agent(S/W)
 It DOES NOT USE *IP protocol* instead uses our *FON* protocol and L2 Protocols.
 
