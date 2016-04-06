@@ -10,7 +10,8 @@ CopyRight(c) MobileConvergence Lab. in KyungHee Univ. All rights reserved.
 * test-ipc: 데몬, Fon-Function간 테스트
 * test-sendrecv: 노드-노드간 테스트
 * aco: anti-colony optimization routing agent software
-* tools: *Minunet* Emulation scripts, read log and make plot.
+* tools: *Minunet* Emulation scripts(driver.mn, make_log.py),
+         Plot makers(hist.py, stat.py, time.py, fit.py).
 
 # Dependencies
 Required:
@@ -34,17 +35,30 @@ eg. 802.3(Ethernet) or 802.11(WiFi).
 
 These were implemented in our Agent:
  - Ant System, Ant Colony System (proposed by *M.Dorigo*)
- - Source Update (proposed in the paper, *A Parallel Ant Colony Optimization 
+ - Source Update (proposed in the paper, *A Parallel Ant Colony Optimization
    Algorithm for All-Pair Routing in MANETs*)
  - Ant Local (proposed by *Sim Young-Bo*)
  - Simple Backtracking Update (proposed by *Sim Young-Bo*)
  - Link Recovery (proposed by *Sim Young-Bo*)
 
-## Example
+## Emulation Example
 
+### Topology
+![Topology](/resource/topo.png)
+*Topology*
+
+### Comparison Ant System with Ant Local
 ![Time Seriese](/resource/time.png)
+*Time Seriese Graph*
+
 ![Histogram](/resource/hist.png)
+*Histogram*
 
 The experiments was conduncted using our agnet in */aco/* and *Mininet*
 
+*Source, node 0* and *Destination, node 15* are in depicted in Fig. *Topolog*.
+
 These graphes was plotted using our scripts in */tools/*
+
+### Link Recovery
+This section will be update.
