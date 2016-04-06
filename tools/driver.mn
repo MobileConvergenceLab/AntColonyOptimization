@@ -48,7 +48,7 @@ def initiate_fon(hosts, port):
 
 def initiate_aco(hosts, aco, port, logfile):
     NUM_HOST    = len(hosts)
-    SLEEP_TIME  = random.random()/10.0
+    #SLEEP_TIME  = random.random()/10.0
 
     i = 0
     for host in hosts:
@@ -60,13 +60,12 @@ def initiate_aco(hosts, aco, port, logfile):
         # 매우 안좋은 효율을 보인다.
         # 아마도 인접 노드들에게 패킷이 전달되어 정보가 업데이트 되는 시간이
         # 계속해서 미뤄져서 그런것이라 판단된다.
-        time.sleep(SLEEP_TIME)
+        #time.sleep(SLEEP_TIME)
 
     if(logfile is None):
         cmdstr = 'xterm -e "%s -p %d -t %d -m"' % (aco, port, NUM_HOST)
-        #cmdstr = 'xterm -e "%s -p %d -t %d -m "' % (aco, port, NUM_HOST)
     else:
-        cmdstr = 'xterm -e "%s -p %d -t %d > %s 2>&1"' % (aco, port, NUM_HOST, logfile )
+        cmdstr = 'xterm -e "%s -p %d -t %d -l > %s 2>&1"' % (aco, port, NUM_HOST, logfile )
     print cmdstr
     hosts[0].cmd(cmdstr)
 
@@ -97,6 +96,9 @@ def main():
     PORT = 9900
     print >> sys.stderr,  'initiating FON at each node'
     initiate_fon(net.hosts, PORT)
+
+    # wait for stabilized state
+    time.sleep(3)
 
     print >> sys.stderr,  'initiating ACO at each node'
     initiate_aco(net.hosts, args.driver, PORT, args.logfile)
