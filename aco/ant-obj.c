@@ -35,10 +35,12 @@ struct _AntObjectOp
 };
 
 struct _RealObject {
+    // These members must be aligned in the same order in AntObject.
     int             source;
     int             destination;
     int             type;
 
+    // Internal Variables
     int             direction;
     int             ini_ttl;
     int             cur_ttl;

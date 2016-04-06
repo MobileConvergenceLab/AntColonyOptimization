@@ -10,15 +10,14 @@ CopyRight(c) MobileConvergence Lab. in KyungHee Univ. All rights reserved.
 * test-ipc: 데몬, Fon-Function간 테스트
 * test-sendrecv: 노드-노드간 테스트
 * aco: anti-colony optimization routing agent software
-* tools: *Minunet* Emulation scripts(driver.mn, make_log.py),
-         Plot makers(hist.py, stat.py, time.py, fit.py).
+* tools: *Minunet* Emulation scripts(driver.mn, make_log.py), Plot drawers(hist.py, stat.py, time.py, fit.py).
 
 # Dependencies
 Required:
 * GCC 4.8.4
 * glib 2.0 (NOT glibc)
 
-...and options:
+...and these are options:
 * Mininet 2.2.1 (for emulation)
 * Python 2.7.6 (for plot)
 * numpy (for plot)
@@ -44,21 +43,50 @@ These were implemented in our Agent:
 ## Emulation Example
 
 ### Topology
-![Topology](/resource/topo.png)
-*Topology*
+![Topology](/resource/topo.png)  
+*Fig 1:Topology used in experiments*
+
+This Topology is just for a our experiments.
+You can use any topology easily using *driver.mn*.
+
+*driver.mn* needs topology input file. The format of the input file are:
+
+ - First line should be the size of an adjacent matrix.
+ - The rest of lines should be an adjacency matrix.
+ - Any comment is not allowed.
+ - Any Surplus line is not allowed.
+
+
+The contents of the example input file are:
+```
+6
+010000
+101001
+010100
+001010
+000101
+010010
+```
+
+and *driver.mn* will generate this topology(*Fig 2*) uinsg *Mininet*:
+
+![ExampleTopo](/resource/example_topo.png)  
+*Fig 2: The topology illustration of the given example input file*
+
+
 
 ### Comparison Ant System with Ant Local
-![Time Seriese](/resource/time.png)
-*Time Seriese Graph*
+![Time Seriese](/resource/time.png)  
+*Fig 3: Time Seriese Graph*
 
-![Histogram](/resource/hist.png)
-*Histogram*
+![Histogram](/resource/hist.png)  
+*Fig 4: Histogram*
 
-The experiments was conduncted using our agnet in */aco/* and *Mininet*
+The experiments was conduncted using *our agnet in /aco/* and *Mininet Emulator*
 
-*Source, node 0* and *Destination, node 15* are in depicted in Fig. *Topolog*.
+*Source, node 0* and *Destination, node 15* are in depicted in Fig. *Fig 1*.
 
-These graphes was plotted using our scripts in */tools/*
+These graphes(*Fig 2, Fig 3*) was plotted using *our scripts in /tools/*
 
 ### Link Recovery
 This section will be update.

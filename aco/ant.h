@@ -11,6 +11,9 @@ typedef struct _Ant
 {
     AcoTable*   table;
     AntObject*  obj;
+
+    // For internal Varialbles
+    const char  data[];
 }Ant;
 
 typedef void (*AntCallbackLogger)(const Ant* ant);

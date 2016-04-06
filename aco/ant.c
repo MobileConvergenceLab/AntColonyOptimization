@@ -29,8 +29,11 @@ typedef struct _AntOperator {
 } AntOperator;
 
 struct _RealAnt {
+    // These members must be aligned in the same order in Ant.
     AcoTable*   table;
     AntObject*  obj;
+
+    // Internal Variables
     AntOperator op;
 };
 

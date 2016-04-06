@@ -24,7 +24,9 @@ typedef struct _AntObject {
     int             source;
     int             destination;
     int             type;
-    char            data[];
+
+    // For internal Varialbles
+    const char      data[];
 } AntObject;
 
 AntObject* ant_object_new           (int source, int destination, int type, int ini_ttl);
