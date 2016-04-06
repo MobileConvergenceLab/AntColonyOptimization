@@ -424,8 +424,13 @@ static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
 
             // If the given neighbor is never visited,
             // stop iterating and return.
-            if(value->tx_count == 0)
+            if(value->never_visited)
             {
+                // switch flag.
+                // because the ant will be send through this neighbor node.
+                value->never_visited = false;
+                aco_table_set(table, value);
+
                 candidates->last_is_never_visited = true;
                 goto RETURN;
             }

@@ -21,6 +21,7 @@ typedef struct _RealValue {
     int         tx_count;
     int         rx_count;
     int         dead_count;
+    bool        never_visited;
     int         local_min;
 
     // Internal Variables
@@ -58,6 +59,7 @@ static inline void init_aco_value(RealValue *value, int target_id, int neigh_id,
     value->tx_count         = 0;
     value->rx_count         = 0;
     value->dead_count       = 0;
+    value->never_visited    = true;
 
     value->local_min        = ACO_TABLE_UNDEFINED_NHOPS,
     value->row              = row;
@@ -108,6 +110,24 @@ static RealValue* _get_value(RealTable* table, int target_id, int neigh_id)
     else
     {
         return &table->array[row][col];
+    }
+}
+
+static void _re_cache_global_min(RealTable* table)
+{
+    
+
+    for(int row=0; row < table->nrow ; row++)
+    {
+        int global_min = ACO_TABLE_UNDEFINED_NHOPS;
+
+        for(int col=0; col < table->ncol; col++)
+        {
+            RealValue* value = &table->array[row][col];
+            global_min = MIN(global_min, value->local_min);
+        }
+
+        table->global_min[row] = global_min;
     }
 }
 
@@ -366,11 +386,13 @@ void aco_table_evaporate_all(AcoTable* ftable, pheromone_t remain_rate)
                 {
                     value = &table->array[row][col];
                     value->pheromone        = table->min;
-                    value->tx_count         = 0;
-                    value->rx_count         = 0;
                     value->dead_count       += 1;
+                    value->never_visited    = true;
                     value->local_min        = ACO_TABLE_UNDEFINED_NHOPS;
                     value->endurance        = table->max_endurance;
+
+                    // the cached global_min(s) are not valid any more.
+                    _re_cache_global_min(table);
                 }
                 break;
             }

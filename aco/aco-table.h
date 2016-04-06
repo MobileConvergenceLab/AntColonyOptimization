@@ -13,6 +13,7 @@ typedef struct _AcoValue {
     int         tx_count;       // 해당 인접노드로 패킷을 보낸 개수
     int         rx_count;       // 해당 인접노드에서 패킷을 수신한 개수
     int         dead_count;
+    bool        never_visited;
     int         local_min;      // 해당 노드까지의 최소 거리
 } AcoValue;
 
