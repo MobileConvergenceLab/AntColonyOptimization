@@ -17,7 +17,7 @@ def read_all_logs(logfile_prefix):
     nfile = 0
     try:
         while(True):
-            logfile = '%s_%02d.log' % (logfile_prefix, nfile)
+            logfile = '%s_%04d.log' % (logfile_prefix, nfile)
             l.append(read_log(logfile))
             nfile = nfile + 1
     except:

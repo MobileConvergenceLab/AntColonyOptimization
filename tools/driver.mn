@@ -46,14 +46,14 @@ def initiate_fon(hosts, port):
         host.cmd(cmdstr)
         i = i+1
 
-def initiate_aco(hosts, aco, port, logfile):
+def initiate_aco(hosts, agent, port, logfile):
     NUM_HOST    = len(hosts)
     #SLEEP_TIME  = random.random()/10.0
 
     i = 0
     for host in hosts:
         if(i!=0):
-            cmdstr = '%s -p %d -t %d > /dev/null 2>&1 &' %(aco, port+i, NUM_HOST)
+            cmdstr = '%s -p %d -t %d > /dev/null 2>&1 &' %(agent, port+i, NUM_HOST)
             host.cmd(cmdstr)
         i = i+1
         # All-pair 알고리즘을 동작시킬 경우, 모든 노드가 (거의)동시에 동작할 때
@@ -63,17 +63,17 @@ def initiate_aco(hosts, aco, port, logfile):
         #time.sleep(SLEEP_TIME)
 
     if(logfile is None):
-        cmdstr = 'xterm -e "%s -p %d -t %d -m"' % (aco, port, NUM_HOST)
+        cmdstr = 'xterm -e "%s -p %d -t %d -m"' % (agent, port, NUM_HOST)
     else:
-        cmdstr = 'xterm -e "%s -p %d -t %d -l > %s 2>&1"' % (aco, port, NUM_HOST, logfile )
+        cmdstr = 'xterm -e "%s -p %d -t %d -l > %s 2>&1"' % (agent, port, NUM_HOST, logfile )
     print cmdstr
     hosts[0].cmd(cmdstr)
 
 def return_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('driver', metavar='driver', type=str,
-                        help='A aco-routing-driver that accept arguments [internal port] and [number of host in the network(topology]')
+    parser.add_argument('agent', metavar='agent', type=str,
+                        help='A aco agent path')
 
     parser.add_argument('topofile', metavar='topofile', type=str,
                         help='A filename or path that describes topology')
@@ -101,7 +101,7 @@ def main():
     time.sleep(3)
 
     print >> sys.stderr,  'initiating ACO at each node'
-    initiate_aco(net.hosts, args.driver, PORT, args.logfile)
+    initiate_aco(net.hosts, args.agent, PORT, args.logfile)
 
     #CLI(net)
     net.stop()

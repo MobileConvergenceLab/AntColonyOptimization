@@ -424,7 +424,7 @@ static void opt_parser(
 
     opterr = 0;
 
-    while ((c = getopt (argc, argv, "p:t:f:a:mh")) != -1)
+    while ((c = getopt (argc, argv, "p:t:f:a:mh:l")) != -1)
     {
         switch (c)
             {
@@ -445,6 +445,7 @@ static void opt_parser(
                 break;
             case 'l':
                 *logger_flag = true;
+                break;
             case '?':
                 if (optopt == 'p' || optopt == 't' || optopt == 'f' || optopt == 'a')
                     fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -466,8 +467,8 @@ static void opt_parser(
                         "                          to make up the pheromone table with the given period\n"
                         "   -a [milisecond]        activate the all-pair routing policy(oneway packet)\n"
                         "                          to update the pheromone table with the given period\n"
-                        "   -m                     activate table monitoring\n"
-                        "   -l                     activate custom logger\n"
+                        "   -m                     activate table monitor\n"
+                        "   -l                     activate custom logger(Called whenevere receive an ant)\n"
                         "   -h                     print this menu and exit\n",
                         argv[0]);
                 exit(exit_value);

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*- 
 import os
 import sys
 import numpy
@@ -13,12 +12,12 @@ def read_log(logfile):
 
     return l
 
-def read_all_logs(logfile_prefix):
+def read_all_logs(dirname):
     l = list()
     nfile = 0
     try:
         while(True):
-            logfile = '%s_%02d.log' % (logfile_prefix, nfile)
+            logfile = './%s/' % dirname + '%04d.log' % nfile
             l.append(read_log(logfile))
             nfile = nfile + 1
     except:
@@ -26,8 +25,8 @@ def read_all_logs(logfile_prefix):
 
     return l
 
-def mean_log(logfile_prefix):
-    all_logs = read_all_logs(logfile_prefix)
+def mean_log(dirname):
+    all_logs = read_all_logs(dirname)
     mean = list()
     nlogs = len(all_logs)
 
@@ -42,7 +41,7 @@ def mean_log(logfile_prefix):
 if __name__=='__main__':
 
     if len(sys.argv) == 1:
-        print "Prefixes must be entered.(*MUST BE Directory name)"
+        print "Directory name must be entered."
         sys.exit(1)
 
     for arg in sys.argv[1:]:

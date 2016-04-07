@@ -1,15 +1,42 @@
-# -*- coding: utf-8 -*- 
+#!/usr/bin/env python
 import os
 import numpy
-import matplotlib.pyplot as plt
+import argparse
 
-TEST_COUNT      = 10
+def conduct_experiments(agent, topo, num, dir):
 
-def experiment(aco, test_count, logfile_prefix):
     l = list()
-    for i in range(0, test_count):
-        logfile = '%s_%02d.log' % (logfile_prefix, i)
-        os.system("sudo ./driver.mn %s ./topo/topo4 -l %s" % (aco, logfile))
+    for i in range(0, num):
+        logfile = './%s/' % dir + '%04d.log' % i
+        os.system("sudo ./driver.mn %s %s -l %s" % (agent, topo, logfile))
         os.system("sync")
 
-experiment("./aco", TEST_COUNT, '')
+def return_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('agent', metavar='agent', type=str,
+                        help='path of aco-routing-agent')
+
+    parser.add_argument('topo', metavar='topo', type=str,
+                        help='filename or path that describes topology')
+
+    parser.add_argument('num', metavar='num', type=int,
+                        help='Number of experiments')
+
+    parser.add_argument('--dir', type=str, required=False, default='.',
+                        help='the name of dir where logfile will be stored')
+
+    return parser.parse_args()
+
+def args_hndler_dir(dir):
+    os.system("mkdir -p %s" % dir)
+
+
+if __name__ == '__main__':
+    args = return_args()
+
+    args_hndler_dir(args.dir)
+
+    conduct_experiments(args.agent, args.topo, args.num, args.dir)
+
+

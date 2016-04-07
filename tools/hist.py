@@ -9,7 +9,7 @@ def read_log(logfile_prefix):
     i = 0
     try:
         while(True):
-            logfile = '%s_%02d.log' % (logfile_prefix, i)
+            logfile = '%s_%04d.log' % (logfile_prefix, i)
             with open(logfile, 'r') as f:
                 lines = f.readlines()
                 for line in lines:
