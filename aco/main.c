@@ -15,7 +15,7 @@
 
 static gboolean table_init_from_daemon(AcoTable *table);
 static gboolean init(MainObj *obj, int port);
-static gboolean table_manual_insert(AcoTable *table, int number_of_hops);
+static gboolean table_manual_insert(AcoTable *table, int number_of_nodes);
 static gboolean recv_callack(const packet *pkt, MainObj* obj);
 static gboolean flood_timeout_event_hlder(MainObj *obj);
 static gboolean oneway_timeout_event_hlder(MainObj *obj);
@@ -32,7 +32,7 @@ static void logger(const Ant* ant);
 /**
  * Argument parser and handler
  */
-static void arg_hndler_table(MainObj *obj, int nhops);
+static void arg_hndler_table(MainObj *obj, int number_of_nodes);
 static void arg_hndler_allpair(MainObj *obj, int period);
 static void arg_hndler_oneway(MainObj *obj, int period);
 static void arg_hndler_monitor(MainObj *obj, bool flag);
@@ -122,13 +122,13 @@ static gboolean table_init_from_daemon(AcoTable *table) {
     return TRUE;
 }
 
-static gboolean table_manual_insert(AcoTable *table, int number_of_hops)
+static gboolean table_manual_insert(AcoTable *table, int number_of_nodes)
 {
-    int host_id = table->host_id;
+    aco_id_t host = table->host;
 
-    for(int i=0; i<number_of_hops; i++)
+    for(int i=0; i<number_of_nodes; i++)
     {
-        if(host_id != i)
+        if(host != i)
         {
             aco_table_add_row(table, i);
         }
@@ -191,7 +191,8 @@ static gboolean init(MainObj *obj, int port) {
 
 static gboolean recv_callack(const packet *pkt, MainObj* obj) {
 
-    Ant*    ant     = ant_restore(pkt, obj->table);
+    Ant* ant = ant_demarshalling(pkt->hdr.pkt_data, pkt->hdr.pkt_len, obj->table);
+    ant_object_arrived_at(ant->obj, ant->table->host);
 
     ant_callback(ant);
     ant_unref(ant);
@@ -204,12 +205,12 @@ static gboolean recv_callack(const packet *pkt, MainObj* obj) {
  */
 static gboolean flood_timeout_event_hlder(MainObj *obj) {
 
-    int dummy   = -1;
-    int source  = obj->table->host_id;
-    Ant* ant    = ant_factory(ANT_TYPE_FLOOD,
-                            source,
-                            dummy,          /* dummy destination */
-                            obj->table);
+    aco_id_t dummy      = -1;
+    aco_id_t source     = obj->table->host;
+    Ant* ant            = ant_factory(ANT_TYPE_FLOOD,
+                                    source,
+                                    dummy,          /* dummy destination */
+                                    obj->table);
 
     ant_send(ant);
     ant_unref(ant);
@@ -222,24 +223,24 @@ static gboolean oneway_timeout_event_hlder(MainObj *obj)
     static int i = 0;
     if(i++ < NUMBER_OF_CYCLES)
     {
-        int dummy           = -1;
-        int source          = obj->table->host_id;
+        aco_id_t dummy      = -1;
+        aco_id_t source     = obj->table->host;
         Ant* ant            = ant_factory(ANT_TYPE_ONEWAY,
                                             source,
                                             dummy,          /* dummy destination. it will be filled in loop. */
                                             obj->table);
-        int* destination    = &ant->obj->destination;
-        int* array          = aco_table_new_dests(obj->table);
+        aco_id_t* destination   = &ant->obj->destination;
+        aco_id_t* targets       = aco_table_new_targets(obj->table);
         int  i;
 
         i=-1;
-        while(array[++i] != -1)
+        while(targets[++i] != -1)
         {
-            *destination = array[i];
+            *destination = targets[i];
             ant_send(ant);
         }
 
-        aco_table_free_array(array);
+        aco_table_free_ids(targets);
         ant_unref(ant);
     }
     else
@@ -258,8 +259,8 @@ static gboolean forward_timeout_event_hlder(MainObj *obj)
     static int cycle = 0;
     if(cycle++ < NUMBER_OF_CYCLES)
     {
-        int source          = obj->table->host_id;
-        Ant* ant            = ant_factory(ANT_TYPE_FORWARD,
+        aco_id_t source     = obj->table->host;
+        Ant* ant            = ant_factory(ANT_TYPE_ROUNDTRIP,
                                             source,
                                             FORWARD_TARGET,
                                             obj->table);
@@ -354,12 +355,12 @@ static void logger(const Ant* ant)
 /**
  * Argument parser and handler
  */
-static void arg_hndler_table(MainObj *obj, int nhops)
+static void arg_hndler_table(MainObj *obj, int number_of_nodes)
 {
-    if(!nhops) return;
+    if(!number_of_nodes) return;
 
     //g_print("Call table_manual_insert()\n");
-    if(!table_manual_insert(obj->table, nhops))
+    if(!table_manual_insert(obj->table, number_of_nodes))
     {
         perror("Call table_manual_insert()");
         exit(EXIT_FAILURE);
@@ -406,7 +407,7 @@ static void arg_hndler_logger(MainObj *obj, bool flag)
 {
     if(!flag) return;
 
-    ant_callback_logger_set(logger);
+    ant_logger_set(logger);
 }
 
 static void opt_parser(

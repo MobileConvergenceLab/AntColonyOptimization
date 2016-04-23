@@ -9,7 +9,7 @@ FONLIB      = fon/int-pair.o fon/fon.o fon/msg_if.o
 OBJS        = ant-obj.o aco-table.o ant.o ant-model.o
 SRCS        = $(OBJS:.o=.c)
 TARGETS     = aco
-UNIT_TESTS  = test-obj test-table
+UNIT_TESTS  = test-obj test-table test-ant
 
 .PHONY: all clean
 
@@ -25,6 +25,9 @@ test-obj: ant-obj.o test-obj.o
 	$(CC) $^ -o $@ $(LIBS)
 
 test-table: aco-table.o test-table.o
+	$(CC) $^ -o $@ $(LIBS)
+
+test-ant: ant.o aco-table.o ant-obj.o ant-model.o test-ant.o $(FONLIB)
 	$(CC) $^ -o $@ $(LIBS)
 
 %.o: %.c

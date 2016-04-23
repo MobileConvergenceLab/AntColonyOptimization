@@ -5,7 +5,7 @@
  * Parameters
  *==============================================================================*/
 // 최소값을 0으로하면 매우 안좋은 결과를 보임. 0보다는 큰 값.
-#define     PHEROMONE_MIN               (0.1)
+#define     PHEROMONE_MIN               (0.01)
 #define     PHEROMONE_MAX               (99.9)
 #define     ENDURANCE_MAX               (30)
 
@@ -16,9 +16,9 @@
 #define     FORWARD_TARGET              (15)
 #define     MONITOR_PERIOD_MS           (1000)
 
-#define     CYCLE_PERIOD_MS             (1000)
+#define     CYCLE_PERIOD_MS             (100)
 #define     NUMBER_OF_CYCLES            (100)
-#define     PACKETS_PER_CYCLE           (10)
+#define     PACKETS_PER_CYCLE           (20)
 
 // The maximum value is Depend on MTU.
 #define     ANT_MAXIMUM_TTL             (128)

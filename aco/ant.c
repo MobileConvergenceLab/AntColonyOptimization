@@ -12,11 +12,12 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stddef.h>
+#include <arpa/inet.h>
 
 /*==============================================================================
  * Private Data
  *==============================================================================*/
-static AntCallbackLogger  STATIC_LOGGER = NULL;
+static AntLogger  STATIC_LOGGER = NULL;
 
 /*==============================================================================
  * Private Type Declarations
@@ -32,6 +33,7 @@ struct _RealAnt {
     // These members must be aligned in the same order in Ant.
     AcoTable*   table;
     AntObject*  obj;
+    int         type;
 
     // Internal Variables
     AntOperator op;
@@ -40,19 +42,18 @@ struct _RealAnt {
 /*==============================================================================
  * Common Private Function Declarations
  *==============================================================================*/
-static RealAnt* _real_ant_new       (AcoTable* table, AntObject* obj, AntOperator op);
-static void _make_pkt               (const AntObject* obj, packet* pkt, int sid, int did);
-static void _unicast_pkt            (AcoTable* table, AntObject* obj, int rid);
-static int _unicast_forward         (AcoTable* table, AntObject* obj);
-static int _unicast_backward        (AcoTable* table, AntObject* obj);
-static void _register_on_table      (AcoTable* table, AntObject* obj);
-static void _update_statistics      (AcoTable* table, AntObject* obj);
-static void _forward_ant            (Ant* fant);
-static void _pheromone_update       (AcoTable* table, int target_id, int neigh_id, int nhops, AntModel model);
+static RealAnt* _real_ant_new       (AcoTable* table, AntObject* obj, int type);
+static void _make_pkt               (const RealAnt *ant, packet* pkt, int sid, int did);
+static void _unicast_pkt            (const RealAnt *ant, int rid);
+static int _unicast_forward         (RealAnt *ant);
+static int _unicast_backward        (RealAnt *ant);
+static void _register_on_table      (RealAnt *ant);
+static void _update_statistics      (RealAnt *ant);
+static void _pheromone_update       (AcoTable* table, aco_id_t target, aco_id_t neigh, aco_dist_t dist, AntModel model);
 static void _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
-static void _destination_update     (AcoTable* table, AntObject* obj, int neigh_id, AntModel model);
-static int _select_neighbor         (AcoTable* table, AntObject* obj);
+static void _destination_update     (AcoTable* table, AntObject* obj, aco_id_t neigh, AntModel model);
+static aco_id_t _select_neighbor    (AcoTable* table, AntObject* obj);
 
 /*==============================================================================
  * Virtual Function Declarations
@@ -60,18 +61,22 @@ static int _select_neighbor         (AcoTable* table, AntObject* obj);
 static void flood_send              (RealAnt* ant);
 static void flood_callback          (RealAnt* ant);
 
-static void oneway_send             (RealAnt* ant);
-static void oneway_callback         (RealAnt* ant);
+static void ow_send                 (RealAnt* ant);
+static void ow_callback             (RealAnt* ant);
 
-static void forward_send            (RealAnt* ant);
-static void forward_callback        (RealAnt* ant);
+static void rt_send                 (RealAnt* ant);
+static void rt_callback             (RealAnt* ant);
+
+static void test_send               (RealAnt* ant);
+static void test_callback           (RealAnt* ant);
 
 static const AntOperator ant_ops[] = {
     /* XXX ant-def.h 의 enum 순서와 동일한 배열을 생성해야 한다. */
-    {flood_send,        flood_callback},        /* ANT_TYPE_FLOOD       */
-    {oneway_send,       oneway_callback},       /* ANT_TYPE_ONEWAY      */
-    {forward_send,      forward_callback},      /* ANT_TYPE_FORWARD     */
-    {NULL,              NULL}                   /* ANT_TYPE_WRONG       */
+    {flood_send,        flood_callback},        // ANT_TYPE_FLOOD
+    {ow_send,           ow_callback},           // ANT_TYPE_ONEWAY
+    {rt_send,           rt_callback},           // ANT_TYPE_ROUNDTRIP
+    {test_send,         test_callback},         // ANT_TYPE_TEST
+    {NULL,              NULL}                   // ANT_TYPE_WRONG
 };
 
 /*==============================================================================
@@ -82,15 +87,78 @@ void ant_unref(Ant* fant)
     RealAnt* ant = (RealAnt*)fant;
 
     ant_object_unref(ant->obj);
-    g_free(ant);
+    free(ant);
 }
 
-void ant_send(Ant* fant)
+typedef uint16_t packed_type_t;
+
+static inline packed_type_t
+pack_type(int type)
+{
+    return htons(type);
+}
+
+static inline int
+unpack_type(packed_type_t type)
+{
+    return (int)ntohs(type);
+}
+
+void
+ant_marshalling(const Ant          *ant,
+                void               **pos,
+                int                *remain)
+{
+    // TODO 길이체크 루틴 추가해야한다.
+
+    *(packed_type_t*)(*pos) = pack_type(ant->type);
+    *pos    += sizeof(packed_type_t);
+    *remain -= sizeof(packed_type_t);
+
+    ant_object_marshalling(ant->obj, pos, remain);
+}
+
+Ant*    
+ant_demarshalling(const void         *buf,
+                  int                len,
+                  AcoTable           *table)
+{
+    AntObject   *obj        = NULL;
+    int         type        = -1;
+
+    type = unpack_type(*(packed_type_t*)(buf));
+    buf += sizeof(packed_type_t);
+    len -= sizeof(packed_type_t);
+
+    obj = ant_object_demarshalling(buf,
+                                   len);
+
+    return (Ant*)_real_ant_new(table, obj, type);
+}
+
+int
+ant_cmp(const Ant       *fant1,
+        const Ant       *fant2)
+{
+    const RealAnt* ant1 = (const RealAnt*)fant1;
+    const RealAnt* ant2 = (const RealAnt*)fant2;
+
+    if(ant1->type != ant2->type)
+    {
+        return -1;
+    }
+
+    return ant_object_cmp(ant1->obj, ant2->obj);
+    
+}
+
+void
+ant_send(Ant *fant)
 {
     RealAnt* ant = (RealAnt*)fant;
 
     if(ant_object_get_ttl(ant->obj) == 0 ||
-       ant->obj->destination == ant->table->host_id) {
+       ant->obj->destination == ant->table->host) {
         /* Drop Packet */
         return;
     }
@@ -101,7 +169,8 @@ void ant_send(Ant* fant)
     }
 }
 
-void ant_callback(Ant* fant)
+void
+ant_callback(Ant* fant)
 {
     RealAnt* ant = (RealAnt*)fant;
     AcoTable* table = ant->table;
@@ -110,7 +179,7 @@ void ant_callback(Ant* fant)
     /* 패킷을 수신했을 때 호출되는 루틴이다. */
 
     // 패킷을 수신했는데 목적지 등록안된 새로운 것이라면 테이블에 추가한다.
-    _register_on_table(table, obj);
+    _register_on_table(ant);
 
     if(ant_object_is_backtracked(obj))
     {
@@ -124,10 +193,10 @@ void ant_callback(Ant* fant)
         aco_table_rx_info_update(table,
                         obj->source,
                         ant_object_previous(obj),
-                        ant_object_nhops(obj));
+                        ant_object_dist(obj));
     }
 
-    // enabled by ant_callback_logger_set() method.
+    // enabled by ant_logger_set() method.
     if(STATIC_LOGGER != NULL)
     {
         STATIC_LOGGER(fant);
@@ -137,40 +206,33 @@ void ant_callback(Ant* fant)
     ant_send(fant);
 }
 
-Ant* ant_restore(const packet* pkt, AcoTable* table)
-{
-    AntObject*  obj;
-
-    obj = ant_object_demarshalling( pkt->hdr.pkt_data,
-                                    pkt->hdr.pkt_len);
-
-    ant_object_arrived_at(obj, table->host_id);
-
-    return (Ant*)_real_ant_new(table, obj, ant_ops[obj->type]);
-}
-
-Ant* ant_factory(int type, int source, int destination, AcoTable* table)
+Ant*
+ant_factory(int         type,
+            aco_id_t    source,
+            aco_id_t    destination,
+            AcoTable    *table)
 {
     if(type == ANT_TYPE_FLOOD)
     {
         destination = PACKET_ID_ANY;
     }
 
-    AntObject*  obj;
+    AntObject   *obj = NULL;
+
     obj = ant_object_new(source,
                          destination,
-                         type,
                          ANT_MAXIMUM_TTL);
 
-    return (Ant*)_real_ant_new(table, obj, ant_ops[obj->type]);
+    return (Ant*)_real_ant_new(table, obj, type);
 }
 
-void ant_callback_logger_set(AntCallbackLogger logger)
+void
+ant_logger_set(AntLogger logger)
 {
     STATIC_LOGGER = logger;
 }
 
-AntCallbackLogger ant_callback_logger_get()
+AntLogger ant_logger_get()
 {
     return STATIC_LOGGER;
 }
@@ -178,35 +240,51 @@ AntCallbackLogger ant_callback_logger_get()
 /*==============================================================================
  * Private Function Implementations
  *==============================================================================*/
-static RealAnt* _real_ant_new(AcoTable* table, AntObject* obj, AntOperator op)
+static RealAnt*
+_real_ant_new(AcoTable      *table,
+              AntObject     *obj,
+              int           type)
 {
-    RealAnt* ant = g_new0(RealAnt, 1);
-    ant->obj    = obj;
-    ant->op     = op;
+    RealAnt* ant = (RealAnt*)malloc(sizeof(RealAnt));
     ant->table  = table;
+    ant->obj    = obj;
+    ant->type   = type;
+    ant->op     = ant_ops[type];
 
     return ant;
 }
 
 
-static void _make_pkt(const AntObject* obj, packet* pkt, int tid, int rid)
+static void
+_make_pkt(const RealAnt     *ant,
+          packet            *pkt,
+          int               tid,
+          int               rid)
 {
-    int len = sizeof(packet) - sizeof(packet_hdr);
-    ant_object_marshalling(obj, &pkt->hdr.pkt_data, &len);
+    void *pos   = pkt->hdr.pkt_data;
+    int  remain = sizeof(packet) - sizeof(packet_hdr);
+
+    ant_marshalling((const Ant*)ant, &pos, &remain);
+
     pkt->hdr.pkt_sid     = tid;
     pkt->hdr.pkt_did     = rid;
-    pkt->hdr.pkt_len     = len;
+    pkt->hdr.pkt_len     = pos - (void*)pkt->hdr.pkt_data;
     pkt->hdr.pkt_type    = FON_FUNC_TYPE_ACO;
 }
 
-static void _unicast_pkt(AcoTable* table, AntObject* obj, int rid)
+static void
+_unicast_pkt(const RealAnt      *ant,
+             int                rid)
 {
+    AcoTable    *table  = ant->table;
+    AntObject   *obj    = ant->obj;
+
     if(rid == PACKET_ID_INVALID)
     {
         return;
     }
 
-    int         tid     = table->host_id;
+    int         tid     = table->host;
     packet      pkt     = {{0,}};
 
     aco_table_tx_info_update(table,
@@ -214,33 +292,39 @@ static void _unicast_pkt(AcoTable* table, AntObject* obj, int rid)
                         rid);
 
     // 마지막으로 패킷을 송신한다.
-    _make_pkt(obj, &pkt, tid, rid);
+    _make_pkt(ant, &pkt, tid, rid);
     fon_sendto(&pkt);
 
     return;
 }
 
-static int _unicast_forward(AcoTable* table, AntObject* obj)
+static int _unicast_forward(RealAnt *ant)
 {
+    AcoTable    *table  = ant->table;
+    AntObject   *obj    = ant->obj;
     int         rid     = _select_neighbor(table, obj);
 
-    _unicast_pkt(table, obj, rid);
+    _unicast_pkt(ant, rid);
 
     return rid;
 }
 
-static int _unicast_backward(AcoTable* table, AntObject* obj)
+static int _unicast_backward(RealAnt *ant)
 {
-    int rid = ant_object_backward_next(obj);
-    _unicast_pkt(table, obj, rid);
+    AntObject   *obj    = ant->obj;
+    int         rid     = ant_object_backward_next(obj);
+
+    _unicast_pkt(ant, rid);
 
     return rid;
 }
 
-static void _register_on_table(AcoTable* table, AntObject* obj)
+static void _register_on_table(RealAnt *ant)
 {
-    int source = obj->source;
-    int host_id = table->host_id;
+    AcoTable    *table  = ant->table;
+    AntObject   *obj    = ant->obj;
+    aco_id_t    source  = obj->source;
+    aco_id_t    host_id = table->host;
 
     /* ant의 생성지를 보고 등록 안되어 있으면 적절하게 등록한다. */
     /* source != host_id: 백트래킹한 패킷이다. 자기자신은 테이블에 추가해서는 안된다.*/
@@ -253,8 +337,11 @@ static void _register_on_table(AcoTable* table, AntObject* obj)
 
 }
 
-static void _update_statistics(AcoTable* table, AntObject* obj)
+static void _update_statistics(RealAnt *ant)
 {
+    AcoTable    *table  = ant->table;
+    AntObject   *obj    = ant->obj;
+
     if(ant_object_is_backtracked(obj))
     {
         return;
@@ -263,15 +350,16 @@ static void _update_statistics(AcoTable* table, AntObject* obj)
     aco_table_rx_info_update(table,
                     obj->source,
                     ant_object_previous(obj),
-                    ant_object_nhops(obj));
+                    ant_object_dist(obj));
 }
 
 static void _backtrack_update(AcoTable* table, AntObject* obj)
 {
-    int id = ant_object_from(obj);
+    aco_id_t id = ant_object_from(obj);
     AcoValue value = {
-        .target_id = obj->destination,
-        .neigh_id = id};
+        .target = obj->destination,
+        .neigh = id,
+        };
 
     if(aco_table_get(table, &value))
     {
@@ -280,28 +368,29 @@ static void _backtrack_update(AcoTable* table, AntObject* obj)
     }
 }
 
-static void _pheromone_update(AcoTable* table,
-                            int target_id,
-                            int neigh_id,
-                            int nhops,
-                            AntModel model)
+static void
+_pheromone_update(AcoTable      *table,
+                  aco_id_t      target,
+                  aco_id_t      neigh,
+                  aco_dist_t    dist,
+                  AntModel      model)
 {
-    if(target_id == PACKET_ID_INVALID ||
-       neigh_id == PACKET_ID_INVALID)
+    if(target == PACKET_ID_INVALID ||
+       neigh == PACKET_ID_INVALID)
     {
         return;
     }
 
     AcoValue value = {
-            .target_id = target_id,
-            .neigh_id = neigh_id,
+            .target = target,
+            .neigh = neigh,
         };
 
     if(aco_table_get(table, &value))
     {
-        int local_min   = value.local_min;
-        int global_min  = aco_table_global_min(table, value.target_id);
-        model(&value.pheromone, global_min, local_min, nhops);
+        aco_dist_t local_min   = value.local_min;
+        aco_dist_t global_min  = aco_table_global_min(table, value.target);
+        model(&value.pheromone, global_min, local_min, dist);
         aco_table_set(table, &value);
     }
 
@@ -318,59 +407,59 @@ static void _source_update(AcoTable* table, AntObject* obj, AntModel model)
         return;
     }
 
-    int neigh_id        = ant_object_previous(obj);
-    int target          = obj->source;
-    int nhops           = ant_object_nhops(obj);
+    aco_id_t    neigh       = ant_object_previous(obj);
+    aco_id_t    target      = obj->source;
+    aco_dist_t  dist        = ant_object_dist(obj);
 
     _pheromone_update(table,
                       target,
-                      neigh_id,
-                      nhops,
+                      neigh,
+                      dist,
                       model);
 }
 
-static void _destination_update(AcoTable* table, AntObject* obj, int neigh_id, AntModel model)
+static void _destination_update(AcoTable* table, AntObject* obj, aco_id_t neigh, AntModel model)
 {
-    if(ant_object_is_visited(obj, neigh_id))
+    if(ant_object_is_visited(obj, neigh))
     {
         return;
     }
 
-    int target          = obj->destination;
-    int nhops           = ant_object_nhops(obj) + 1;
+    aco_id_t    target          = obj->destination;
+    aco_dist_t  dist            = ant_object_dist(obj) + 1;
 
     _pheromone_update(table,
                       target,
-                      neigh_id,
-                      nhops,
+                      neigh,
+                      dist,
                       model);
 }
 
-static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
+static void _acs_update(AcoTable* table, AntObject* obj, aco_id_t neigh)
 {
-    if(ant_object_is_visited(obj, neigh_id))
+    if(ant_object_is_visited(obj, neigh))
     {
         return;
     }
 
-    int target_id = obj->destination;
+    aco_id_t target = obj->destination;
 
-    if(target_id == PACKET_ID_INVALID ||
-       neigh_id == PACKET_ID_INVALID)
+    if(target == PACKET_ID_INVALID ||
+       neigh == PACKET_ID_INVALID)
     {
         return;
     }
 
     AcoValue value =
         {
-            .target_id = target_id,
-            .neigh_id = neigh_id,
+            .target = target,
+            .neigh = neigh,
         };
 
     if(aco_table_get(table, &value))
     {
-        int global_min  = aco_table_global_min(table, obj->source)+1; 
-        int nhops       = ant_object_nhops(obj) + 1;
+        aco_dist_t  global_min  = aco_table_global_min(table, obj->source)+1; 
+        aco_dist_t  nhops       = ant_object_dist(obj) + 1;
 
         ant_colony_system_model(&value.pheromone,
                                 global_min,
@@ -388,8 +477,8 @@ static void _acs_update(AcoTable* table, AntObject* obj, int neigh_id)
 typedef struct _Candidates
 {
     AcoValue        candi[ACO_TABLE_MAX_COL];
-    pheromone_t     initial_accumulated;
-    pheromone_t     accumulated[ACO_TABLE_MAX_COL];
+    aco_ph_t        initial_accumulated;
+    aco_ph_t        accumulated[ACO_TABLE_MAX_COL];
     int             len;
     bool last_is_never_visited;
 } Candidates;
@@ -397,29 +486,24 @@ typedef struct _Candidates
 /**
  * It means(asserts) that "accumulated[-1] == initial_accumulated".
  */
-CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, initial_accumulated) + sizeof(pheromone_t), ant_c);
+CASSERT(offsetof(Candidates, accumulated) == offsetof(Candidates, initial_accumulated) + sizeof(aco_ph_t), ant_c);
 
 static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
 {
     Candidates*     candidates      = malloc(sizeof(Candidates));
-    AcoTableIter    iter            = {{0,}};
     AcoValue        *value          = NULL;
 
     candidates->initial_accumulated     = 0.0;
     candidates->len                     = 0;
     candidates->last_is_never_visited   = false;
 
-    if(!aco_table_iter_begin(table, obj->destination, &iter))
-    {
-        goto RETURN;
-    }
-
-    // iterating
-    do
+    for(AcoTableIter iter =aco_table_iter_begin(table, obj->destination);
+        iter.valid;
+        aco_table_iter_next(table, &iter))
     {
         value = &iter.value;
 
-        if(!ant_object_is_visited(obj, value->neigh_id))
+        if(!ant_object_is_visited(obj, value->neigh))
         {
             candidates->candi[candidates->len] = *value;
             candidates->accumulated[candidates->len] = candidates->accumulated[candidates->len-1] + value->pheromone;
@@ -439,7 +523,6 @@ static Candidates* _candidates_new(const AntObject* obj, AcoTable* table)
             }
         }
     }
-    while(aco_table_iter_next(table, &iter));
 
 RETURN:
     return candidates;
@@ -450,13 +533,13 @@ static inline void _candidates_free(Candidates* candidates)
     free(candidates);
 }
 
-static int _select_neighbor_randomly(const Candidates* candidates)
+static aco_id_t _select_neighbor_randomly(const Candidates* candidates)
 {
-    g_assert(candidates->len > 0);
+    assert(candidates->len > 0);
 
-    pheromone_t sum_pheromone   = 0;
+    aco_ph_t    sum_pheromone   = 0;
     const int   len             = candidates->len;
-    int         neigh_id             = PACKET_ID_INVALID;
+    aco_id_t    neigh           = PACKET_ID_INVALID;
     double      random          = 0;
 
     sum_pheromone = candidates->accumulated[len-1];
@@ -465,24 +548,24 @@ static int _select_neighbor_randomly(const Candidates* candidates)
     {
         if(random < candidates->accumulated[i])
         {
-            neigh_id = candidates->candi[i].neigh_id;
+            neigh = candidates->candi[i].neigh;
             break;
         }
     }
 
-    return neigh_id;
+    return neigh;
 }
 
-static int _select_neighbor(AcoTable* table, AntObject* obj)
+static aco_id_t _select_neighbor(AcoTable* table, AntObject* obj)
 {
-    int             destination     = obj->destination;
-    int             neigh_id        = PACKET_ID_INVALID;
+    aco_id_t        destination     = obj->destination;
+    aco_id_t        neigh           = PACKET_ID_INVALID;
     Candidates*     candidates      = NULL;
 
     if(aco_table_is_neigh(table, destination))
     {
-        neigh_id = destination;
-        return neigh_id;
+        neigh = destination;
+        return neigh;
     }
 
     // Get neighbor nodes that do not make loop.
@@ -492,7 +575,7 @@ static int _select_neighbor(AcoTable* table, AntObject* obj)
     // Do backtracking
     if(candidates->len == 0)
     {
-        neigh_id = ant_object_previous(obj);
+        neigh = ant_object_previous(obj);
         goto RETURN;
     }
 
@@ -500,18 +583,18 @@ static int _select_neighbor(AcoTable* table, AntObject* obj)
     // Give it a preference.
     if(candidates->last_is_never_visited)
     {
-        neigh_id = candidates->candi[candidates->len-1].neigh_id;
+        neigh = candidates->candi[candidates->len-1].neigh;
         goto RETURN;
     }
 
     // If all nodes are visited at least once,
     // Randomly select a node considering the pheromone concentration.
-    neigh_id = _select_neighbor_randomly(candidates);
+    neigh = _select_neighbor_randomly(candidates);
 
 RETURN:
     _candidates_free(candidates);
 
-    return neigh_id;
+    return neigh;
 }
 
 /*
@@ -523,12 +606,12 @@ RETURN:
  *==============================================================================*/
 static void flood_send(RealAnt* ant)
 {
-    AcoTable* table = ant->table;
-    AntObject* obj = ant->obj;
-    int     sid     = table->host_id;
-    int     did;
-    packet  pkt;
-    int     *neighs = NULL;
+    AcoTable    *table  = ant->table;
+    AntObject   *obj    = ant->obj;
+    int         sid     = table->host;
+    int         did     = -1;
+    packet      pkt     = {};
+    aco_ids_t   neighs  = NULL;
 
     /* flooding except the already visited nodes. */
     neighs = aco_table_new_neighs(table);
@@ -540,12 +623,12 @@ static void flood_send(RealAnt* ant)
         /* 이미 방문한 곳이면, 보낼 필요가 없다. */
         if(ant_object_is_visited(obj, did)) continue;
 
-        _make_pkt(obj, &pkt, sid, did);
+        _make_pkt(ant, &pkt, sid, did);
 
         fon_sendto(&pkt);
     }
 
-    aco_table_free_array(neighs);
+    aco_table_free_ids(neighs);
 
     return;
 }
@@ -558,14 +641,14 @@ static void flood_callback(RealAnt* ant)
 /*==============================================================================
  *
  *==============================================================================*/
-static void oneway_send(RealAnt* ant)
+static void ow_send(RealAnt* ant)
 {
-    _unicast_forward(ant->table, ant->obj);
+    _unicast_forward(ant);
 
     return;
 }
 
-static void    oneway_callback (RealAnt* ant)
+static void    ow_callback (RealAnt* ant)
 {
     _source_update(ant->table, ant->obj, ant_normalizing_model);
 }
@@ -573,25 +656,26 @@ static void    oneway_callback (RealAnt* ant)
 /*==============================================================================
  *
  *==============================================================================*/
-
-static void forward_send(RealAnt* ant)
+static void rt_send(RealAnt* ant)
 {
-    AcoTable* table = ant->table;
     AntObject* obj = ant->obj;
 
     if(ant_object_get_direction(obj) == ANT_OBJ_DIRECTION_FORWARD)
     {
-        int neigh_id = _unicast_forward(table, obj);
 
         #if ANT_DESTINATION_UPDATE
-        _destination_update(table, obj, neigh_id, ANT_MODEL_SELECTOR);
+        aco_id_t neigh = _unicast_forward(ant);
+        _destination_update(table, obj, neigh, ANT_MODEL_SELECTOR);
         #elif ANT_ACS_UPDATE
-        _acs_update(table, obj, neigh_id);
+        _unicast_forward(ant);
+        _acs_update(table, obj, neigh);
+        #else
+        _unicast_forward(ant);
         #endif
     }
     else if(ant_object_get_direction(obj) ==  ANT_OBJ_DIRECTION_BACKWARD)
     {
-        _unicast_backward(table, obj);
+        _unicast_backward(ant);
     }
     else
     {
@@ -599,7 +683,7 @@ static void forward_send(RealAnt* ant)
     }
 }
 
-static void forward_callback(RealAnt* ant)
+static void rt_callback(RealAnt* ant)
 {
     AntObject* obj = ant->obj;
 
@@ -610,5 +694,15 @@ static void forward_callback(RealAnt* ant)
     ant_object_change_direction(obj);
 }
 
+/*==============================================================================
+ *
+ *==============================================================================*/
+static void test_send(RealAnt* ant)
+{
+    // Do nothing
+}
 
-
+static void test_callback(RealAnt* ant)
+{
+    // Do nothing
+}

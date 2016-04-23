@@ -1,7 +1,7 @@
 #include "ant-model.h"
 #include "ant-def.h"
 
-void ant_normalizing_model(pheromone_t *ph, int global_min, int local_min, int nhops)
+void ant_normalizing_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {
     int normalized = local_min - global_min + 1;
     int divider = normalized*normalized;
@@ -12,25 +12,25 @@ void ant_normalizing_model(pheromone_t *ph, int global_min, int local_min, int n
     *ph += ANT_COCENTRATION_CONST / (double)(divider);
 }
 
-void ant_local_model(pheromone_t *ph, int global_min, int local_min, int nhops)
+void ant_local_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {
     *ph += ANT_COCENTRATION_CONST / (double)(local_min);
 }
 
-void ant_density_model(pheromone_t *ph, int global_min, int local_min, int nhops)
+void ant_density_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {
     *ph += ANT_COCENTRATION_CONST;
 }
 
-void ant_system_model(pheromone_t *ph, int global_min, int local_min, int nhops)
+void ant_system_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {
-    *ph += ANT_COCENTRATION_CONST / (double)(nhops);
+    *ph += ANT_COCENTRATION_CONST / (double)(dist);
 }
 
-void ant_colony_system_model(pheromone_t *ph, int global_min, int local_min, int nhops)
+void ant_colony_system_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {
-    if(global_min == nhops)
+    if(global_min == dist)
     {
-        *ph += ANT_COCENTRATION_CONST / (double)(nhops);
+        *ph += ANT_COCENTRATION_CONST / (double)(dist);
     }
 }

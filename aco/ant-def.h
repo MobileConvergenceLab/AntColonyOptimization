@@ -9,17 +9,19 @@
 enum ANT_TYPE {
     ANT_TYPE_FLOOD,
     ANT_TYPE_ONEWAY,
-    ANT_TYPE_FORWARD,
+    ANT_TYPE_ROUNDTRIP,
+    ANT_TYPE_TEST,
     ANT_TYPE_WRONG,
 };
 
 static const char ANT_TYPE_STR[][64] = {
     "ANT_TYPE_FLOOD",
     "ANT_TYPE_ONEWAY",
-    "ANT_TYPE_FORWARD",
+    "ANT_TYPE_ROUNDTRIP",
+    "ANT_TYPE_TEST",
     "ANT_TYPE_WRONG",
 };
 
-#include "ant-parameter.h"
+#include "aco-parameters.h"
 
 #endif /* ANT_DEF_H */

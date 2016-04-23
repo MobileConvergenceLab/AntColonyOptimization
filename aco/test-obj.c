@@ -10,7 +10,7 @@ void my_object_assert(AntObject* obj, int in_direction, int in_previous, int in_
     int previous        = ant_object_previous(obj);
     int from            = ant_object_from(obj);
     int next            = ant_object_backward_next(obj);
-    int nhops           = ant_object_nhops(obj);
+    int nhops           = ant_object_dist(obj);
     bool is_backtrackted = ant_object_is_backtracked(obj);
 
     assert(direction    == in_direction);
@@ -32,7 +32,6 @@ AntObject* ant_object_new_test()
 
     AntObject *obj = ant_object_new(0,                          // SOURCE
                                     5,                          // DEST
-                                    0,                          // TYPE
                                     24);                        // INI TTL
     direction       = ANT_OBJ_DIRECTION_FORWARD;
     previous        = -1;
@@ -146,17 +145,19 @@ AntObject* ant_object_new_test()
 
 void test_masharling(AntObject* obj1)
 {
-    char buff[2048];
-    int buflen = 2048;
+    char buf[2048];
+    int remain  = 2048;
+    void *pos   = buf;
 
     AntObject* obj2 = NULL;
 
-    ant_object_marshalling(obj1, buff, &buflen);
-    obj2 = ant_object_demarshalling(buff, buflen);
+    ant_object_marshalling(obj1, &pos, &remain);
+    obj2 = ant_object_demarshalling(buf, pos - (void*)buf);
 
     if(ant_object_cmp(obj1, obj2))
     {
-        abort();
+        printf("Test fail\n");
+        exit(-1);
     }
 }
 
@@ -166,9 +167,10 @@ int main()
 
     obj = ant_object_new_test();
     test_masharling(obj);
-    ant_object_unref(obj);
 
     printf("Test Successful\n");
+    ant_object_print(obj);
 
+    ant_object_unref(obj);
     return 0;
 }

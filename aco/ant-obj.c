@@ -8,6 +8,7 @@
 #include "ant-obj.h"
 #include "ant-def.h"
 
+
 /*==============================================================================
  * Private Declaration
  *==============================================================================*/
@@ -22,23 +23,23 @@ static const char _DirectionString[][64] = {
     "ANT_OBJ_DIRECTION_INVALID"
 };
 
-typedef struct _RealObject RealObject;
-typedef struct _AntObjectOp AntObjectOp;
+typedef struct _RealObject              RealObject;
+typedef struct _AntObjectOp             AntObjectOp;
+typedef struct _AntObjectMarshalled     AntObjectMarshalled;
 
 struct _AntObjectOp
 {
-    void (*op_arrived_at)       (RealObject *obj, int cur_id);
-    bool (*op_is_backtracked)   (const RealObject *obj);
-    int  (*op_nhops)            (const RealObject *obj);
-    int  (*op_previous)         (const RealObject *obj);
-    int  (*op_backward_next)    (const RealObject *obj);
+    void        (*op_arrived_at)       (RealObject* obj, aco_id_t id);
+    bool        (*op_is_backtracked)   (const RealObject* obj);
+    aco_dist_t  (*op_dist)             (const RealObject* obj);
+    aco_id_t    (*op_previous)         (const RealObject* obj);
+    aco_id_t    (*op_backward_next)    (const RealObject* obj);
 };
 
 struct _RealObject {
     // These members must be aligned in the same order in AntObject.
-    int             source;
-    int             destination;
-    int             type;
+    aco_id_t        source;
+    aco_id_t        destination;
 
     // Internal Variables
     int             direction;
@@ -47,49 +48,48 @@ struct _RealObject {
     int             nmemory;
     int             npath;
     int             nvisited;
-    int             nvhops;
-    int             memory[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
-    int             path[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
-    int             visited[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
-    int             vhops[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
+    int             ndists;
+    aco_id_t        memory[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
+    aco_id_t        path[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
+    aco_id_t        visited[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
+    aco_dist_t      dists[ANT_OBJ_MAXIMUM_ARR_SIZE+1];
     AntObjectOp     op;
 };
 
 
-typedef struct __attribute__((packed)) _AntObjectMarshalled {
+struct __attribute__((packed)) _AntObjectMarshalled {
     uint16_t    source;
     uint16_t    destination;
-    uint16_t    type;
     uint16_t    direction;
     uint16_t    ini_ttl;
     uint16_t    cur_ttl;
     uint16_t    nmemory;
     uint16_t    npath;
     uint16_t    nvisited;
-    uint16_t    nvhops;
+    uint16_t    ndists;
     uint16_t    data[];
-} AntObjectMarshalled;
+};
 
 /*==============================================================================
  * Virtual Function Declaration
  *==============================================================================*/
-void op_forward_arrived_at          (RealObject *obj, int cur_id);
-bool op_forward_is_backtracked      (const RealObject *obj);
-int  op_forward_nhops               (const RealObject *obj);
-int  op_forward_previous            (const RealObject *obj);
-int  op_forward_backward_next       (const RealObject *obj);
+void        op_forward_arrived_at          (RealObject* obj, aco_id_t cur);
+bool        op_forward_is_backtracked      (const RealObject* obj);
+aco_dist_t  op_forward_dist                (const RealObject* obj);
+aco_id_t    op_forward_previous            (const RealObject* obj);
+aco_id_t    op_forward_backward_next       (const RealObject* obj);
 
-void op_backward_arrived_at         (RealObject *obj, int cur_id);
-bool op_backward_is_backtracked     (const RealObject *obj);
-int  op_backward_nhops              (const RealObject *obj);
-int  op_backward_previous           (const RealObject *obj);
-int  op_backward_backward_next      (const RealObject *obj);
+void        op_backward_arrived_at         (RealObject* obj, aco_id_t cur);
+bool        op_backward_is_backtracked     (const RealObject* obj);
+aco_dist_t  op_backward_dist               (const RealObject* obj);
+aco_id_t    op_backward_previous           (const RealObject* obj);
+aco_id_t    op_backward_backward_next      (const RealObject* obj);
 
 static const AntObjectOp AntObjectOps[ANT_OBJ_DIRECTION_MAX] = {
     {
         .op_arrived_at          = op_forward_arrived_at,
         .op_is_backtracked      = op_forward_is_backtracked,
-        .op_nhops               = op_forward_nhops,
+        .op_dist                = op_forward_dist,
         .op_previous            = op_forward_previous,
         .op_backward_next       = op_forward_backward_next,
     },
@@ -97,7 +97,7 @@ static const AntObjectOp AntObjectOps[ANT_OBJ_DIRECTION_MAX] = {
     {
         .op_arrived_at          = op_backward_arrived_at,
         .op_is_backtracked      = op_backward_is_backtracked,
-        .op_nhops               = op_backward_nhops,
+        .op_dist                = op_backward_dist,
         .op_previous            = op_backward_previous,
         .op_backward_next       = op_backward_backward_next,
     }
@@ -107,96 +107,177 @@ static const AntObjectOp AntObjectOps[ANT_OBJ_DIRECTION_MAX] = {
 /*==============================================================================
  * Private Function Implementations
  *==============================================================================*/
-static void _init_array(int *array)
+static void
+_init_dists(aco_dist_t      *dists)
 {
     for(int i=0; i< ANT_OBJ_MAXIMUM_ARR_SIZE+1; i++)
     {
-        array[i] = _INVALID_VALUE;
+        dists[i] = _INVALID_VALUE;
     }
 }
 
-static inline void _add_array(int *array, int *len, int value)
+static void
+_init_ids(aco_id_t      *ids)
+{
+    for(int i=0; i< ANT_OBJ_MAXIMUM_ARR_SIZE+1; i++)
+    {
+        ids[i] = _INVALID_VALUE;
+    }
+}
+
+static inline void
+_add_id(aco_id_t        *ids,
+        int             *len,
+        aco_id_t        id)
 {
     if(*len == ANT_OBJ_MAXIMUM_ARR_SIZE)
     {
         /* exceed array boundary */
         abort();
     }
-    array[(*len)++] = value;
+    ids[(*len)++] = id;
 }
-#define _add_path(obj, val)                             _add_array((obj->path),     &(obj->npath),      (val))
-#define _add_memory(obj, val)                           _add_array((obj->memory),   &(obj->nmemory),    (val))
-#define _add_visited(obj, val)                          _add_array((obj->visited),  &(obj->nvisited),   (val))
-#define _add_vhops(obj, val)                            _add_array((obj->vhops),    &(obj->nvhops),     (val))
+#define _add_path(obj, val)                             _add_id((obj->path),     &(obj->npath),      (val))
+#define _add_memory(obj, val)                           _add_id((obj->memory),   &(obj->nmemory),    (val))
+#define _add_visited(obj, val)                          _add_id((obj->visited),  &(obj->nvisited),   (val))
 
+static inline void
+_add_dists(RealObject       *obj,
+           aco_dist_t       dist)
+{
+    int* len = &obj->ndists;
+    if(*len == ANT_OBJ_MAXIMUM_ARR_SIZE)
+    {
+        /* exceed array boundary */
+        abort();
+    }
+    obj->dists[(*len)++] = dist;
+}
 
-static inline void _pop_array(int *array, int *len)
+static inline void
+_pop_ids(aco_id_t       *ids,
+         int            *len)
 {
     if(*len == 0)
     {
         /* exceed array boundary */
         abort();
     }
-    array[--(*len)] = _INVALID_VALUE;
+    ids[--(*len)] = _INVALID_VALUE;
 }
-#define _pop_path(obj)                                  _pop_array((obj->path),     &(obj->npath))
-#define _pop_memory(obj)                                _pop_array((obj->memory),   &(obj->nmemory))
-#define _pop_visited(obj)                               _pop_array((obj->visited),  &(obj->nvisited))
-#define _pop_vhops(obj)                                 _pop_array((obj->vhops),    &(obj->nvhops))
+#define _pop_path(obj)                                  _pop_ids((obj->path),     &(obj->npath))
+#define _pop_memory(obj)                                _pop_ids((obj->memory),   &(obj->nmemory))
+#define _pop_visited(obj)                               _pop_ids((obj->visited),  &(obj->nvisited))
 
-static void _marshalling(uint16_t data[], int *data_index, const int arr[], int arr_len)
+static inline void
+_pop_dists(aco_dist_t       *dists,
+           int              *len)
+{
+    if(*len == 0)
+    {
+        /* exceed array boundary */
+        abort();
+    }
+    dists[--(*len)] = _INVALID_VALUE;
+}
+
+static void
+_marshalling_ids(uint16_t           data[],
+                 int                *data_index,
+                 const aco_id_t     ids[],
+                 int                len)
 {
     for(int i=0;
-        i<arr_len;
+        i<len;
         i++, (*data_index)++)
     {
-        data[*data_index] = htons(arr[i]);
+        data[*data_index] = htons(ids[i]);
     }
 }
-#define _marshalling_memory(obj, data, data_index)      _marshalling(data,  data_index, obj->memory,    obj->nmemory)
-#define _marshalling_path(obj, data, data_index)        _marshalling(data,  data_index, obj->path,      obj->npath)
-#define _marshalling_visited(obj, data, data_index)     _marshalling(data,  data_index, obj->visited,   obj->nvisited)
-#define _marshalling_vhops(obj, data, data_index)       _marshalling(data,  data_index, obj->vhops,     obj->nvhops)
+#define _marshalling_memory(obj, data, data_index)      _marshalling_ids(data,  data_index, obj->memory,    obj->nmemory)
+#define _marshalling_path(obj, data, data_index)        _marshalling_ids(data,  data_index, obj->path,      obj->npath)
+#define _marshalling_visited(obj, data, data_index)     _marshalling_ids(data,  data_index, obj->visited,   obj->nvisited)
 
-static void _demarshalling(const uint16_t data[], int *data_index, int arr[], int arr_len)
+static void
+_marshalling_dist(uint16_t          data[],
+                  int               *data_index,
+                  const aco_dist_t  dists[],
+                  int               len)
 {
     for(int i=0;
-        i<arr_len;
+        i<len;
         i++, (*data_index)++)
     {
-        arr[i] = ntohs(data[*data_index]);
+        data[*data_index] = htons(dists[i]);
     }
 }
-#define _demarshalling_memory(obj, data, data_index)    _demarshalling(data,  data_index, obj->memory,    obj->nmemory)
-#define _demarshalling_path(obj, data, data_index)      _demarshalling(data,  data_index, obj->path,      obj->npath)
-#define _demarshalling_visited(obj, data, data_index)   _demarshalling(data,  data_index, obj->visited,   obj->nvisited)
-#define _demarshalling_vhops(obj, data, data_index)     _demarshalling(data,  data_index, obj->vhops,     obj->nvhops)
+#define _marshalling_vhops(obj, data, data_index)       _marshalling_dist(data,  data_index, obj->dists,     obj->ndists)
+
+static void
+_demarshalling_ids(const uint16_t       data[],
+                   int                  *data_index,
+                   aco_id_t             ids[],
+                   int                  len)
+{
+    for(int i=0;
+        i<len;
+        i++, (*data_index)++)
+    {
+        ids[i] = ntohs(data[*data_index]);
+    }
+}
+#define _demarshalling_memory(obj, data, data_index)    _demarshalling_ids(data,  data_index, obj->memory,    obj->nmemory)
+#define _demarshalling_path(obj, data, data_index)      _demarshalling_ids(data,  data_index, obj->path,      obj->npath)
+#define _demarshalling_visited(obj, data, data_index)   _demarshalling_ids(data,  data_index, obj->visited,   obj->nvisited)
+
+static void
+_demarshalling_dists(const uint16_t     data[],
+                     int                *data_index,
+                     aco_dist_t         dists[],
+                     int                len)
+{
+    for(int i=0;
+        i<len;
+        i++, (*data_index)++)
+    {
+        dists[i] = ntohs(data[*data_index]);
+    }
+}
+#define _demarshalling_vhops(obj, data, data_index)     _demarshalling_dists(data,  data_index, obj->dists,     obj->ndists)
 
 
-static int _find_visited_idx(const int *visited, int id)
+static int
+_find_visited_idx(const aco_id_t    *visited,
+                  aco_id_t          id)
 {
     // temporarily set and rollback
     int idx = -1;
 
-    *(int*)(visited+_MAGIC_INDEX) = id;
+    *(aco_id_t*)(visited+_MAGIC_INDEX) = id;
     while(visited[++idx] != id);
-    *(int*)(visited+_MAGIC_INDEX) = _INVALID_VALUE;
+    *(aco_id_t*)(visited+_MAGIC_INDEX) = _INVALID_VALUE;
 
     return idx;
 }
 
-static inline size_t _calc_marshalled_size(const RealObject *obj)
+static inline size_t
+_calc_marshalled_size(const RealObject  *obj)
 {
     return
         sizeof(AntObjectMarshalled) +
-        sizeof(uint16_t)*(obj->nmemory + obj->npath + obj->nvisited + obj->nvhops);
+        sizeof(uint16_t)*(obj->nmemory + obj->npath + obj->nvisited + obj->ndists);
 }
 
-static void _real_object_init(RealObject *obj, int source, int destination, int type, int direction, int ini_ttl, int cur_ttl)
+static void
+_real_object_init(RealObject    *obj,
+                  aco_id_t      source,
+                  aco_id_t      destination,
+                  int           direction,
+                  int           ini_ttl,
+                  int           cur_ttl)
 {
     obj->source         = source;
     obj->destination    = destination;
-    obj->type           = type;
     obj->direction      = direction;
     obj->ini_ttl        = ini_ttl;
     obj->cur_ttl        = cur_ttl;
@@ -205,24 +286,29 @@ static void _real_object_init(RealObject *obj, int source, int destination, int 
     obj->nmemory        = 0;
     obj->npath          = 0;
     obj->nvisited       = 0;
-    obj->nvhops         = 0;
+    obj->ndists         = 0;
 
-    _init_array(obj->memory);
-    _init_array(obj->path);
-    _init_array(obj->visited);
-    _init_array(obj->vhops);
+    _init_ids(obj->memory);
+    _init_ids(obj->path);
+    _init_ids(obj->visited);
+    _init_dists(obj->dists);
 
     _add_memory(obj, source);
     _add_path(obj, source);
     _add_visited(obj, source);
-    _add_vhops(obj, 0);
+    _add_dists(obj, 0);
 }
 
-static RealObject* _real_object_new(int source, int destination, int type, int direction, int ini_ttl, int cur_ttl)
+static RealObject*
+_real_object_new(aco_id_t   source,
+                 aco_id_t   destination,
+                 int        direction,
+                 int        ini_ttl,
+                 int        cur_ttl)
 {
     RealObject* obj     = malloc(sizeof(RealObject));
 
-    _real_object_init(obj, source, destination, type, direction, ini_ttl, cur_ttl);
+    _real_object_init(obj, source, destination, direction, ini_ttl, cur_ttl);
 
     return obj;
 }
@@ -230,38 +316,41 @@ static RealObject* _real_object_new(int source, int destination, int type, int d
 /*==============================================================================
  * Public Function Implementations
  *==============================================================================*/
-AntObject* ant_object_new(int source, int destination, int type, int ini_ttl)
+
+AntObject*
+ant_object_new(aco_id_t     source,
+               aco_id_t     destination,
+               int          ini_ttl)
 {
     return (AntObject*)_real_object_new(source,
                                         destination,
-                                        type,
                                         ANT_OBJ_DIRECTION_FORWARD,
                                         ini_ttl,
                                         ini_ttl);
 }
 
-void ant_object_unref(AntObject *fobj)
+void
+ant_object_unref(AntObject      *fobj)
 {
     free(fobj);
 }
 
-void ant_object_print(const AntObject *fobj)
+void
+ant_object_print(const AntObject    *fobj)
 {
-    const RealObject* obj    = (const RealObject*)fobj;
-    const int   *memory      = obj->memory;
-    const int   *visited    = obj->visited;
-    const int   *vhops      = obj->vhops;
-    const int   *path       = obj->path;
+    const RealObject*   obj         = (const RealObject*)fobj;
+    const aco_id_t*     memory      = obj->memory;
+    const aco_id_t*     visited     = obj->visited;
+    const aco_id_t*     path        = obj->path;
+    const aco_dist_t*   vhops       = obj->dists;
 
     printf("source:      %-4d\n"
            "destination: %-4d\n"
            "direction:   %s\n"
-           "type:        %-4d\n"
            "cur_ttl:     %-4d\n",
            obj->source,
            obj->destination,
            _DirectionString[obj->direction],
-           obj->type,
            obj->cur_ttl);
 
     printf("memory:      ");
@@ -277,7 +366,7 @@ void ant_object_print(const AntObject *fobj)
     printf("\n");
 
     printf("vhops:       ");
-    for(int i=0; i< obj->nvhops; i++) {
+    for(int i=0; i< obj->ndists; i++) {
         printf("%-4d", vhops[i]);
     }
     printf("\n");
@@ -292,10 +381,10 @@ void ant_object_print(const AntObject *fobj)
 
 void
 ant_object_print_path(
-        const AntObject    *fobj)
+        const AntObject*    fobj)
 {
-    const RealObject   *obj     = (const RealObject*)fobj;
-    const int          *path    = obj->path;
+    const RealObject*   obj     = (const RealObject*)fobj;
+    const aco_id_t*     path    = obj->path;
 
     for(int i=0; i< obj->npath; i++) {
         printf("%2d  ", path[i]);
@@ -305,10 +394,10 @@ ant_object_print_path(
 
 void
 ant_object_print_memory(
-        const AntObject    *fobj)
+        const AntObject *   fobj)
 {
-    const RealObject    *obj        = (const RealObject*)fobj;
-    const int           *memory     = obj->memory;
+    const RealObject*    obj        = (const RealObject*)fobj;
+    const aco_id_t*      memory     = obj->memory;
 
     for(int i=0; i< obj->nmemory; i++) {
         fprintf(stderr, "%4d", memory[i]);
@@ -319,37 +408,37 @@ ant_object_print_memory(
 
 void
 ant_object_print_dbg_hops(
-        const AntObject    *fobj)
+        const AntObject *   fobj)
 {
-    const RealObject    *obj        = (const RealObject*)fobj;
-    fprintf(stderr, "%4d\n", obj->vhops[obj->nvisited-1]);
+    const RealObject*    obj        = (const RealObject*)fobj;
+    fprintf(stderr, "%4d\n", obj->dists[obj->nvisited-1]);
 }
 
-void ant_object_marshalling(const AntObject *fobj, void *out_buf, int *out_buflen)
+void ant_object_marshalling(const AntObject *fobj, void **pos, int *reamin)
 {
     const RealObject    *in_obj     = (const RealObject*)fobj;
     AntObjectMarshalled*
-                        marshalled  = out_buf;
+                        marshalled  = *pos;
     size_t              len         = _calc_marshalled_size(in_obj);
 
-    if(*out_buflen < len) {
+    if(*reamin < len) {
         /* Not enough memry */
         abort();
     }
     else {
-        *out_buflen = len;
+        *reamin -= len;
+        *pos    += len;
     }
 
     marshalled->source      = htons(in_obj->source);
     marshalled->destination = htons(in_obj->destination);
-    marshalled->type        = htons(in_obj->type);
     marshalled->direction   = htons(in_obj->direction);
     marshalled->ini_ttl     = htons(in_obj->ini_ttl);
     marshalled->cur_ttl     = htons(in_obj->cur_ttl);
     marshalled->nmemory     = htons(in_obj->nmemory);
     marshalled->npath       = htons(in_obj->npath);
     marshalled->nvisited    = htons(in_obj->nvisited);
-    marshalled->nvhops      = htons(in_obj->nvhops);
+    marshalled->ndists      = htons(in_obj->ndists);
 
     int data_index  = 0;
     _marshalling_memory     (in_obj, marshalled->data, &data_index);
@@ -360,14 +449,15 @@ void ant_object_marshalling(const AntObject *fobj, void *out_buf, int *out_bufle
     return;
 }
 
-AntObject* ant_object_demarshalling(const void *in_buf, int buflen)
+AntObject*
+ant_object_demarshalling(const void     *in_buf,
+                         int            buflen)
 {
     const AntObjectMarshalled*
                     marshalled = in_buf;
 
     RealObject*         obj         = _real_object_new(ntohs(marshalled->source),
                                         ntohs(marshalled->destination),
-                                        ntohs(marshalled->type),
                                         ntohs(marshalled->direction),
                                         ntohs(marshalled->ini_ttl),
                                         ntohs(marshalled->cur_ttl)
@@ -376,7 +466,7 @@ AntObject* ant_object_demarshalling(const void *in_buf, int buflen)
     obj->nmemory    = ntohs(marshalled->nmemory);
     obj->npath      = ntohs(marshalled->npath);
     obj->nvisited   = ntohs(marshalled->nvisited);
-    obj->nvhops     = ntohs(marshalled->nvhops);
+    obj->ndists     = ntohs(marshalled->ndists);
 
     int data_index = 0;
     _demarshalling_memory     (obj, marshalled->data, &data_index);
@@ -387,26 +477,31 @@ AntObject* ant_object_demarshalling(const void *in_buf, int buflen)
     return (AntObject*)obj;
 }
 
-bool ant_object_is_visited(const AntObject *fobj, int id)
+bool
+ant_object_is_visited(const AntObject   *fobj,
+                      aco_id_t          id)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     int         idx         = -1;
-    const int   *visited    = obj->visited;
+    const aco_id_t*   visited    = obj->visited;
 
     idx = _find_visited_idx(visited, id);
 
     return idx != _MAGIC_INDEX;
 }
 
-void ant_object_arrived_at(AntObject *fobj, int cur_id)
+void
+ant_object_arrived_at(AntObject     *fobj,
+                      aco_id_t      cur)
 {
-    RealObject *obj = (RealObject*)fobj;
-    obj->op.op_arrived_at(obj, cur_id);
+    RealObject* obj = (RealObject*)fobj;
+    obj->op.op_arrived_at(obj, cur);
 }
 
-bool ant_object_change_direction(AntObject *fobj)
+bool
+ant_object_change_direction(AntObject *fobj)
 {
-    RealObject *obj = (RealObject*)fobj;
+    RealObject* obj = (RealObject*)fobj;
 
     if(obj->direction == ANT_OBJ_DIRECTION_FORWARD &&
         obj->destination == obj->memory[obj->nmemory - 1])
@@ -427,51 +522,51 @@ bool ant_object_change_direction(AntObject *fobj)
 
 bool
 ant_object_is_backtracked(
-        const AntObject    *fobj)
+        const AntObject *   fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     return obj->op.op_is_backtracked(obj);
 }
 
-int
-ant_object_nhops(const AntObject *fobj)
+aco_dist_t
+ant_object_dist(const AntObject *fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
-    return obj->op.op_nhops(obj);
+    const RealObject* obj = (const RealObject*)fobj;
+    return obj->op.op_dist(obj);
 }
 
-int ant_object_get_direction(const AntObject *fobj)
+int
+ant_object_get_direction(const AntObject *fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     return obj->direction;
 }
 
-int ant_object_get_ttl(const AntObject *fobj)
+int
+ant_object_get_ttl(const AntObject *fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     return obj->cur_ttl;
 }
 
-int ant_object_previous(const AntObject *fobj)
+aco_id_t
+ant_object_previous(const AntObject *fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     return obj->op.op_previous(obj);
 }
 
-int ant_object_backward_next(const AntObject *fobj)
+aco_id_t
+ant_object_backward_next(const AntObject *fobj)
 {
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
     return obj->op.op_backward_next(obj);
 }
 
-int ant_object_cmp(const AntObject* fobj1, const AntObject* fobj2)
+aco_id_t
+ant_object_from(const AntObject* fobj)
 {
-    return memcmp(fobj1, fobj2, sizeof(RealObject));
-}
-
-int ant_object_from(const AntObject* fobj)
-{
-    const RealObject *obj = (const RealObject*)fobj;
+    const RealObject* obj = (const RealObject*)fobj;
 
     if(obj->nmemory != 1)
     {
@@ -483,18 +578,27 @@ int ant_object_from(const AntObject* fobj)
     }
 }
 
+int
+ant_object_cmp(const AntObject      *fobj1,
+               const AntObject      *fobj2)
+{
+    return memcmp(fobj1, fobj2, sizeof(RealObject));
+}
+
 /*==============================================================================
  * Virtual Function Implementations
  *==============================================================================*/
 
-void op_forward_arrived_at(RealObject *obj, int cur_id)
+void
+op_forward_arrived_at(RealObject    *obj,
+                      aco_id_t      cur)
 {
     /* 수신한 패킷이 backtrack 된것인지 아닌지에 따라 패킷을 업데이트한다. */
-    if(ant_object_is_visited((AntObject*)obj, cur_id))
+    if(ant_object_is_visited((AntObject*)obj, cur))
     {
         obj->cur_ttl--;
         _pop_path(obj);
-        _add_memory(obj, cur_id);
+        _add_memory(obj, cur);
     }
     else
     {
@@ -503,16 +607,17 @@ void op_forward_arrived_at(RealObject *obj, int cur_id)
 
         obj->cur_ttl--;
 
-        _add_visited(obj, cur_id);
-        _add_path(obj, cur_id);
-        _add_memory(obj, cur_id);
+        _add_visited(obj, cur);
+        _add_path(obj, cur);
+        _add_memory(obj, cur);
 
         pre_visited_idx = _find_visited_idx(obj->visited, pre_id);
-        _add_vhops(obj, obj->vhops[pre_visited_idx] + 1);
+        _add_dists(obj, obj->dists[pre_visited_idx] + 1);
     }
 }
 
-bool op_forward_is_backtracked(const RealObject *obj)
+bool
+op_forward_is_backtracked(const RealObject  *obj)
 {
     /*
      * last_path: current node id
@@ -536,12 +641,14 @@ bool op_forward_is_backtracked(const RealObject *obj)
     }
 }
 
-int  op_forward_nhops(const RealObject *obj)
+aco_dist_t
+op_forward_dist(const RealObject    *obj)
 {
     return obj->npath-1;
 }
 
-int  op_forward_previous(const RealObject *obj)
+aco_id_t
+op_forward_previous(const RealObject    *obj)
 {
     int npath           = obj->npath;
 
@@ -554,7 +661,8 @@ int  op_forward_previous(const RealObject *obj)
     return obj->path[npath-2];
 }
 
-int  op_forward_backward_next(const RealObject *obj)
+aco_id_t
+op_forward_backward_next(const RealObject   *obj)
 {
     return _INVALID_VALUE;
 }
@@ -563,28 +671,33 @@ int  op_forward_backward_next(const RealObject *obj)
 /*==============================================================================
  * Virtual Function Implementations
  *==============================================================================*/
-void op_backward_arrived_at(RealObject *obj, int cur_id)
+void
+op_backward_arrived_at(RealObject       *obj,
+                       aco_id_t         cur)
 {
     obj->cur_ttl--;
-    _add_memory(obj, cur_id);
+    _add_memory(obj, cur);
 
     // 만약 abort 발생 조건은,
     // 개미가 path대로 돌아가지 않을 경우이다.
     // Ex) 1 - 2 - 3 - 2 - 5 - 2 - 1
-    assert(cur_id == obj->path[obj->npath - 1 - obj->ini_ttl + obj->cur_ttl]);
+    assert(cur == obj->path[obj->npath - 1 - obj->ini_ttl + obj->cur_ttl]);
 }
 
-bool op_backward_is_backtracked(const RealObject *obj)
+bool
+op_backward_is_backtracked(const RealObject     *obj)
 {
     return false;
 }
 
-int  op_backward_nhops(const RealObject *obj)
+aco_dist_t
+op_backward_dist(const RealObject       *obj)
 {
     return obj->ini_ttl - obj->cur_ttl;
 }
 
-int  op_backward_previous(const RealObject *obj)
+aco_id_t
+op_backward_previous(const RealObject       *obj)
 {
     if(obj->ini_ttl == obj->cur_ttl)
     {
@@ -596,7 +709,8 @@ int  op_backward_previous(const RealObject *obj)
     }
 }
 
-int  op_backward_backward_next(const RealObject *obj)
+aco_id_t
+op_backward_backward_next(const RealObject      *obj)
 {
     int lst_idx = obj->npath - 1;
     int diff    = obj->ini_ttl - obj->cur_ttl;
@@ -608,5 +722,4 @@ int  op_backward_backward_next(const RealObject *obj)
     }
     return obj->path[cur_idx - 1];
 }
-
 
