@@ -36,8 +36,9 @@ test-ant: ant.o aco-table.o ant-obj.o ant-model.o test-ant.o $(FONLIB)
 clean:
 	$(RM) $(TARGETS) $(UNIT_TESTS) *.o
 
+tag:
+	ctags -n -R
+
 dep:
 	gccmakedep $(SRCS) $(INCLUDE)
-
-
 

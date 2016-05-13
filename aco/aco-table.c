@@ -589,7 +589,7 @@ aco_table_rx_info_update(AcoTable       *ftable,
         value->local_min    = MIN(value->local_min, dist);
         value->rx_count     += 1;
         value->endurance    = table->max_endurance;
-        _aco_value_set(table, value, false);
+        _aco_value_set(table, value, true);
 
         return true;
     }
