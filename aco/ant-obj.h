@@ -6,6 +6,10 @@
 #ifndef ANT_OBJ_H
 #define ANT_OBJ_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "aco-types.h"
 
 // Direction constant
@@ -52,5 +56,8 @@ void            ant_object_print_path           (const AntObject    *obj);
 void            ant_object_print_memory         (const AntObject    *obj);
 void            ant_object_print_dbg_hops       (const AntObject    *obj);
 
-#endif /* ANT_OBJ_H */
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
+#endif /* ANT_OBJ_H */

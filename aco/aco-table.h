@@ -3,6 +3,10 @@
 
 #include "aco-types.h"
 
+#ifdef __cpluscplus
+extern "C" {
+#endif
+
 #define ACO_TABLE_MAX_ROW                   (512)
 #define ACO_TABLE_MAX_COL                   (16)
 
@@ -70,5 +74,9 @@ bool            aco_table_rx_info_update    (AcoTable       *table,
                                              aco_id_t       target,
                                              aco_id_t       neigh,
                                              aco_dist_t     dist);
+
+#ifdef __cpluscplus
+} // extern "C"
+#endif
 
 #endif /* AcoTable_H */

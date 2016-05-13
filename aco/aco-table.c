@@ -33,8 +33,8 @@ typedef struct _RealValue {
 typedef struct _RealTable {
     // These members must be aligned in the same order in AcoTable.
     const aco_id_t      host;
-    const aco_ph_t      min;
-    const aco_ph_t      max;
+    const aco_ph_t      min_pheromone;
+    const aco_ph_t      max_pheromone;
     const int           max_endurance;
 
     // Internal Variables
@@ -43,7 +43,7 @@ typedef struct _RealTable {
     int                 ncol;
     aco_id_t            col_to_neigh[ACO_TABLE_MAX_COL + 1];
     aco_id_t            row_to_target[ACO_TABLE_MAX_ROW + 1];
-    aco_dist_t          global_min[ACO_TABLE_MAX_ROW];
+    aco_dist_t          global_mins[ACO_TABLE_MAX_ROW];
     RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
 } RealTable;
 
@@ -52,7 +52,7 @@ typedef struct _RealTable {
  *==============================================================================*/
 
 static inline void
-init_aco_value(RealValue    *value,
+aco_value_init(RealValue    *value,
                aco_id_t     target,
                aco_id_t     neigh,
                aco_ph_t     pheromone,
@@ -110,21 +110,40 @@ _find_idx(aco_id_t       *idx_to_id,
 #define _FIND_COL(table, id)    _find_idx(table->col_to_neigh, ACO_TABLE_MAX_COL, id)
 #define _FIND_ROW(table, id)    _find_idx(table->row_to_target, ACO_TABLE_MAX_ROW, id)
 
-static inline void
-_set_value(RealTable    *table,
-           RealValue    *value)
+static void
+_aco_table_re_cache_global_min(RealTable *table, int row)
 {
-    aco_dist_t* local_min = &table->global_min[value->row];
+    int global_min = ACO_TABLE_UNDEFINED_DIST;
 
-    value->pheromone    = MIN(table->max, MAX(table->min, value->pheromone));
-    *local_min          = MIN(*local_min, value->local_min);
+    for(int col=0; col < table->ncol; col++)
+    {
+        RealValue* value = &table->array[row][col];
+        global_min = MIN(global_min, value->local_min);
+    }
+
+    table->global_mins[row] = global_min;
+}
+
+// value값을 변경하고 나면 반드시 호출되어야 한다.
+static inline void
+_aco_value_set(RealTable    *table,
+               RealValue    *value,
+               bool         local_min_changed)   /* if value->local_min is changed,
+                                                    this flag must be ture */
+{
+    if(local_min_changed)
+    {
+        _aco_table_re_cache_global_min(table, value->row);
+    }
+    value->pheromone    = MIN(table->max_pheromone, MAX(table->min_pheromone, value->pheromone));
     value->endurance    = MAX(value->endurance, 0);
+
 }
 
 static RealValue*
-_get_value(RealTable    *table,
-           aco_id_t     target,
-           int          neigh)
+_aco_value_get(RealTable    *table,
+               aco_id_t     target,
+               int          neigh)
 {
     int row = _FIND_ROW(table, target);
     int col = _FIND_COL(table, neigh);
@@ -136,25 +155,6 @@ _get_value(RealTable    *table,
     else
     {
         return &table->array[row][col];
-    }
-}
-
-static void
-_re_cache_global_min(RealTable  *table)
-{
-    
-
-    for(int row=0; row < table->nrow ; row++)
-    {
-        int global_min = ACO_TABLE_UNDEFINED_DIST;
-
-        for(int col=0; col < table->ncol; col++)
-        {
-            RealValue* value = &table->array[row][col];
-            global_min = MIN(global_min, value->local_min);
-        }
-
-        table->global_min[row] = global_min;
     }
 }
 
@@ -170,8 +170,8 @@ aco_table_new(aco_id_t      host,
     RealTable* table = malloc(sizeof(RealTable));
 
     *(aco_id_t*)&table->host      = host;
-    *(aco_ph_t*)&table->min  = min;
-    *(aco_ph_t*)&table->max  = max;
+    *(aco_ph_t*)&table->min_pheromone  = min;
+    *(aco_ph_t*)&table->max_pheromone  = max;
     *(int*)&table->max_endurance= max_endurance;
 
     table->ref_count = 1;
@@ -179,7 +179,7 @@ aco_table_new(aco_id_t      host,
     table->ncol      = 0;
     _init_ids(table->col_to_neigh,      sizeof(table->col_to_neigh));
     _init_ids(table->row_to_target,     sizeof(table->row_to_target));
-    _init_dists(table->global_min,      sizeof(table->global_min));
+    _init_dists(table->global_mins,     sizeof(table->global_mins));
 
     return (AcoTable*)table;
 }
@@ -230,10 +230,10 @@ aco_table_add_row(AcoTable      *ftable,
 
     for(int col=0; col<table->ncol; col++)
     {
-        init_aco_value(&table->array[row][col],
+        aco_value_init(&table->array[row][col],
                 target,
                 table->col_to_neigh[col],
-                table->min,
+                table->min_pheromone,
                 row,
                 col,
                 table->max_endurance);
@@ -267,10 +267,10 @@ aco_table_add_col(AcoTable      *ftable,
 
     for(int row=0; row<table->nrow; row++)
     {
-        init_aco_value(&table->array[row][col],
+        aco_value_init(&table->array[row][col],
                 table->row_to_target[row],
                 neigh,
-                table->min,
+                table->min_pheromone,
                 row,
                 col,
                 table->max_endurance);
@@ -379,7 +379,7 @@ aco_table_get(AcoTable      *ftable,
               AcoValue      *fvalue)
 {
     RealTable* table = (RealTable*)ftable;
-    RealValue* value = _get_value(table, fvalue->target, fvalue->neigh);
+    RealValue* value = _aco_value_get(table, fvalue->target, fvalue->neigh);
 
     if(value == NULL)
     {
@@ -399,7 +399,7 @@ aco_table_set(AcoTable          *ftable,
               const AcoValue    *fvalue)
 {
     RealTable* table = (RealTable*)ftable;
-    RealValue* value = _get_value(table, fvalue->target, fvalue->neigh);
+    RealValue* value = _aco_value_get(table, fvalue->target, fvalue->neigh);
 
     if(value == NULL)
     {
@@ -409,7 +409,7 @@ aco_table_set(AcoTable          *ftable,
     {
         // Pheromone
         *(AcoValue*)value = *fvalue;
-        _set_value(table, value);
+        _aco_value_set(table, value, true);
     }
 
     return true;
@@ -435,20 +435,21 @@ aco_table_evaporate_all(AcoTable        *ftable,
                 for(int col=0; col<table->ncol; col++)
                 {
                     value = &table->array[row][col];
-                    value->pheromone        = table->min;
+                    value->pheromone        = table->min_pheromone;
                     value->dead_count       += 1;
                     value->never_visited    = true;
                     value->local_min        = ACO_TABLE_UNDEFINED_DIST;
                     value->endurance        = table->max_endurance;
 
-                    // the cached global_min(s) are not valid any more.
-                    _re_cache_global_min(table);
+                    _aco_value_set(table, value, false/* for lazy evaluation */);
                 }
+                // the cached global_min(s) are not valid any more.
+                _aco_table_re_cache_global_min(table, row);
                 break;
             }
             else
             {
-                value->pheromone = MAX(value->pheromone*remain_rate, table->min);
+                value->pheromone = MAX(value->pheromone*remain_rate, table->min_pheromone);
             }
         }
     }
@@ -557,13 +558,13 @@ aco_table_tx_info_update(AcoTable       *ftable,
                          aco_id_t       neigh)
 {
     RealTable* table = (RealTable*)ftable;
-    RealValue* value = _get_value(table, target, neigh);
+    RealValue* value = _aco_value_get(table, target, neigh);
 
     if(value != NULL)
     {
         value->tx_count     += 1;
         value->endurance    -= 1;
-        _set_value(table, value);
+        _aco_value_set(table, value, false);
 
         return true;
     }
@@ -580,7 +581,7 @@ aco_table_rx_info_update(AcoTable       *ftable,
                          aco_dist_t     dist)
 {
     RealTable* table = (RealTable*)ftable;
-    RealValue* value = _get_value(table, target, neigh);
+    RealValue* value = _aco_value_get(table, target, neigh);
 
     if(value != NULL)
     {
@@ -588,7 +589,7 @@ aco_table_rx_info_update(AcoTable       *ftable,
         value->local_min    = MIN(value->local_min, dist);
         value->rx_count     += 1;
         value->endurance    = table->max_endurance;
-        _set_value(table, value);
+        _aco_value_set(table, value, false);
 
         return true;
     }
