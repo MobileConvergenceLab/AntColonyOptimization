@@ -9,13 +9,13 @@ AcoTable* test_new()
             100,    // max pheromone
             30);    // max endurance
 
-    aco_table_add_col(table, 0);
-    aco_table_add_col(table, 1);
-    aco_table_add_col(table, 2);
+    aco_table_add_neigh(table, 0);
+    aco_table_add_neigh(table, 1);
+    aco_table_add_neigh(table, 2);
 
-    aco_table_add_row(table, 3);
-    aco_table_add_row(table, 4);
-    aco_table_add_row(table, 5);
+    aco_table_add_target(table, 3);
+    aco_table_add_target(table, 4);
+    aco_table_add_target(table, 5);
 
     return table;
 }

@@ -206,8 +206,8 @@ aco_table_unref(AcoTable        *ftable)
 }
 
 bool
-aco_table_add_row(AcoTable      *ftable,
-                  aco_id_t      target)
+aco_table_add_target(AcoTable      *ftable,
+                     aco_id_t      target)
 {
     RealTable* table = (RealTable*)ftable;
 
@@ -243,8 +243,8 @@ aco_table_add_row(AcoTable      *ftable,
 }
 
 bool
-aco_table_add_col(AcoTable      *ftable,
-                  aco_id_t      neigh)
+aco_table_add_neigh(AcoTable      *ftable,
+                    aco_id_t      neigh)
 {
     RealTable* table = (RealTable*)ftable;
 

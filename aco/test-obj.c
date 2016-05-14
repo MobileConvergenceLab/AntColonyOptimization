@@ -9,7 +9,7 @@ void my_object_assert(AntObject* obj, int in_direction, int in_previous, int in_
     int direction       = ant_object_get_direction(obj);
     int previous        = ant_object_previous(obj);
     int from            = ant_object_from(obj);
-    int next            = ant_object_backward_next(obj);
+    int next            = ant_object_next(obj);
     int nhops           = ant_object_dist(obj);
     bool is_backtrackted = ant_object_is_backtracked(obj);
 

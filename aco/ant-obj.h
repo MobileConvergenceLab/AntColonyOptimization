@@ -47,7 +47,7 @@ aco_dist_t      ant_object_dist                 (const AntObject    *obj);
 int             ant_object_get_direction        (const AntObject    *obj);
 int             ant_object_get_ttl              (const AntObject    *obj);
 aco_id_t        ant_object_previous             (const AntObject    *obj);
-aco_id_t        ant_object_backward_next        (const AntObject    *obj);
+aco_id_t        ant_object_next                 (const AntObject    *obj);
 aco_id_t        ant_object_from                 (const AntObject    *obj);
 int             ant_object_cmp                  (const AntObject    *obj1,
                                                  const AntObject    *obj2);

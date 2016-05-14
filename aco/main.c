@@ -109,10 +109,10 @@ static gboolean table_init_from_daemon(AcoTable *table) {
 
     for(i=0; i<len; i++) {
         if(tuple[i].hops == HOPS_NEIGH) {
-            aco_table_add_col(table, tuple[i].id);
+            aco_table_add_neigh(table, tuple[i].id);
         }
         else {
-            aco_table_add_row(table, tuple[i].id);
+            aco_table_add_target(table, tuple[i].id);
         }
     }
 
@@ -130,7 +130,7 @@ static gboolean table_manual_insert(AcoTable *table, int number_of_nodes)
     {
         if(host != i)
         {
-            aco_table_add_row(table, i);
+            aco_table_add_target(table, i);
         }
     }
 

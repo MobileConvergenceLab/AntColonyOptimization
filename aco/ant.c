@@ -33,9 +33,9 @@ struct _RealAnt {
     // These members must be aligned in the same order in Ant.
     AcoTable*   table;
     AntObject*  obj;
-    int         type;
 
     // Internal Variables
+    int         type;
     AntOperator op;
 };
 
@@ -105,11 +105,13 @@ unpack_type(packed_type_t type)
 }
 
 void
-ant_marshalling(const Ant          *ant,
+ant_marshalling(const Ant          *fant,
                 void               **pos,
                 int                *remain)
 {
     // TODO 길이체크 루틴 추가해야한다.
+
+    RealAnt* ant = (RealAnt*)fant;
 
     *(packed_type_t*)(*pos) = pack_type(ant->type);
     *pos    += sizeof(packed_type_t);
@@ -312,7 +314,7 @@ static int _unicast_forward(RealAnt *ant)
 static int _unicast_backward(RealAnt *ant)
 {
     AntObject   *obj    = ant->obj;
-    int         rid     = ant_object_backward_next(obj);
+    int         rid     = ant_object_next(obj);
 
     _unicast_pkt(ant, rid);
 
@@ -332,7 +334,7 @@ static void _register_on_table(RealAnt *ant)
        !aco_table_is_neigh(table, source) && 
         source != host_id) 
     {
-        aco_table_add_row(table, source);
+        aco_table_add_target(table, source);
     }
 
 }

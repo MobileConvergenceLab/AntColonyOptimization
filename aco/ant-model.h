@@ -3,6 +3,10 @@
 
 #include "aco-types.h"
 
+#ifdef __cpluscplus
+extern "C" {
+#endif
+
 /**
  * @ph:         the pheromone value of the given pair(target_id, neigh_id).
  * @global_min: global_min of the given target_id
@@ -16,5 +20,9 @@ void ant_system_model        (aco_ph_t* ph, aco_dist_t global_min, aco_dist_t lo
 void ant_colony_system_model (aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist);
 void ant_local_model         (aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist);
 void ant_normalizing_model   (aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist);
+
+#ifdef __cpluscplus
+}
+#endif
 
 #endif

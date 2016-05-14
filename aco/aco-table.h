@@ -43,9 +43,9 @@ AcoTable*       aco_table_new               (aco_id_t       host,
                                              int            max_endurance);
 AcoTable*       aco_table_ref               (AcoTable       *table);
 void            aco_table_unref             (AcoTable       *table);
-bool            aco_table_add_row           (AcoTable       *table,
+bool            aco_table_add_target        (AcoTable       *table,
                                              aco_id_t       target);
-bool            aco_table_add_col           (AcoTable       *table,
+bool            aco_table_add_neigh         (AcoTable       *table,
                                              aco_id_t       neigh);
 bool            aco_table_is_target         (AcoTable       *table,
                                              aco_id_t       target);

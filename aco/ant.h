@@ -6,13 +6,16 @@
 #include "fon/packet_if.h"
 #include "aco-table.h"
 
+#ifdef __cpluscplus
+extern "C" {
+#endif
+
 typedef struct _AcoTable    AcoTable;
 
 typedef struct _Ant
 {
     AcoTable*   table;
     AntObject*  obj;
-    int         type;
 
     // For internal Varialbles
     const char  data[];
@@ -37,5 +40,9 @@ void        ant_send            (Ant                *ant);
 void        ant_callback        (Ant                *ant);
 void        ant_logger_set      (AntLogger          logger);
 AntLogger   ant_logger_get      ();
+
+#ifdef __cpluscplus
+}
+#endif
 
 #endif /* ANT_H */
