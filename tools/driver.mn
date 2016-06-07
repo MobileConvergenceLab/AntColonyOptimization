@@ -3,6 +3,8 @@
 import sys
 import os
 import time
+import threading
+import subprocess
 import argparse
 import random
 
@@ -46,9 +48,33 @@ def initiate_fon(hosts, port):
         host.cmd(cmdstr)
         i = i+1
 
+def do_kill_aco_node(wait_time, port):
+    time.sleep(wait_time)
+
+    ps = subprocess.Popen(['ps', '-ef'], stdout=subprocess.PIPE)
+    grep = subprocess.Popen(['grep', '[.]/aco -p %d' % port], stdin=ps.stdout, stdout=subprocess.PIPE)
+
+    ps.stdout.close()
+    out, error = grep.communicate()
+    pid = int(out.split()[1])
+    ec = os.system("kill %d" % pid)
+
+    print '=========================================================='
+    print 'Node has been killed'
+    print ' - port:', port
+    print ' - pid:', pid
+    print ' - ec:', ec
+    print '=========================================================='
+
+
+def kill_aco_node(wait_time, port):
+    th = threading.Thread(target=do_kill_aco_node, args=(wait_time, port,))
+    th.start()
+
 def initiate_aco(hosts, agent, port, logfile):
     NUM_HOST    = len(hosts)
-    #SLEEP_TIME  = random.random()/10.0
+
+    kill_aco_node(10, 9914)
 
     i = 0
     for host in hosts:
@@ -56,11 +82,6 @@ def initiate_aco(hosts, agent, port, logfile):
             cmdstr = '%s -p %d -t %d > /dev/null 2>&1 &' %(agent, port+i, NUM_HOST)
             host.cmd(cmdstr)
         i = i+1
-        # All-pair 알고리즘을 동작시킬 경우, 모든 노드가 (거의)동시에 동작할 때
-        # 매우 안좋은 효율을 보인다.
-        # 아마도 인접 노드들에게 패킷이 전달되어 정보가 업데이트 되는 시간이
-        # 계속해서 미뤄져서 그런것이라 판단된다.
-        #time.sleep(SLEEP_TIME)
 
     if(logfile is None):
         cmdstr = 'xterm -e "%s -p %d -t %d -m"' % (agent, port, NUM_HOST)
@@ -98,6 +119,7 @@ def main():
     initiate_fon(net.hosts, PORT)
 
     # wait for stabilized state
+    # (Making Forwarding table exchainging informations withneighbor node)
     time.sleep(3)
 
     print >> sys.stderr,  'initiating ACO at each node'

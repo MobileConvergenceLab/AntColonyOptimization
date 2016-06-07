@@ -6,6 +6,7 @@
 #include <limits.h>
 
 #include "fon/algorithm.h"
+#include "aco-parameters.h"
 
 #define ACO_TABLE_UNDEFINED_DIST        (INT_MAX)
 
@@ -428,7 +429,7 @@ aco_table_evaporate_all(AcoTable        *ftable,
         {
             value = &table->array[row][col];
 
-            if(value->endurance == 0)
+            if(value->endurance <= 0)
             {
                 // Clear all column in given row.
 
@@ -563,7 +564,15 @@ aco_table_tx_info_update(AcoTable       *ftable,
     if(value != NULL)
     {
         value->tx_count     += 1;
+
+#if ENDURANCE_ENABLE
+#pragma message("Enable Enduracne")
         value->endurance    -= 1;
+#else
+#pragma message("Disable Enduracne")
+        value->endurance    = 1;
+#endif /* ENDURANCE_ENABLE */
+
         _aco_value_set(table, value, false);
 
         return true;
