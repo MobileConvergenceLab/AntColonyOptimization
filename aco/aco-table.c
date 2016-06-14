@@ -8,14 +8,14 @@
 #include "fon/algorithm.h"
 #include "aco-parameters.h"
 
-#define ACO_TABLE_UNDEFINED_DIST        (INT_MAX)
+#define ACO_TABLE_UNDEFINED_DIST        (ACO_DIST_MAX)
 
 /*==============================================================================
  * Private Type Declarations
  *==============================================================================*/
 // Internal AcoValue
 typedef struct _RealValue {
-    // These members must be aligned in the same order in AcoValue.
+// These members must be aligned in the same order in AcoValue.
     aco_id_t    target;
     aco_id_t    neigh;
     aco_ph_t    pheromone;
@@ -25,20 +25,20 @@ typedef struct _RealValue {
     bool        never_visited;
     aco_dist_t  local_min;
 
-    // Internal Variables
+// Internal Variables
     int             row;        //< row index
     int             col;        //< col index
     int             endurance;
 } RealValue;
 
 typedef struct _RealTable {
-    // These members must be aligned in the same order in AcoTable.
+// These members must be aligned in the same order in AcoTable.
     const aco_id_t      host;
     const aco_ph_t      min_pheromone;
     const aco_ph_t      max_pheromone;
     const int           max_endurance;
 
-    // Internal Variables
+// Internal Variables
     int                 ref_count;
     int                 nrow;
     int                 ncol;
@@ -46,6 +46,12 @@ typedef struct _RealTable {
     aco_id_t            row_to_target[ACO_TABLE_MAX_ROW + 1];
     aco_dist_t          global_mins[ACO_TABLE_MAX_ROW];
     RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
+
+    // called when aco_table_evaporate_all() is called
+    void            (*callee)(AcoTable* table, void* arg);
+    void            *callee_arg;
+    /// called when table object is destroyed.
+    void            (*arg_dtor)(void *arg);
 } RealTable;
 
 /*==============================================================================
@@ -182,6 +188,10 @@ aco_table_new(aco_id_t      host,
     _init_ids(table->row_to_target,     sizeof(table->row_to_target));
     _init_dists(table->global_mins,     sizeof(table->global_mins));
 
+    table->callee       = NULL;
+    table->callee_arg   = NULL;
+    table->arg_dtor     = NULL;
+
     return (AcoTable*)table;
 }
 
@@ -195,6 +205,13 @@ aco_table_ref(AcoTable      *ftable)
     return (AcoTable*)table;
 }
 
+static void
+aco_table_dtor(RealTable        *table)
+{
+    table->arg_dtor(table->callee_arg);
+    free(table);
+}
+
 void
 aco_table_unref(AcoTable        *ftable)
 {
@@ -202,7 +219,7 @@ aco_table_unref(AcoTable        *ftable)
 
     if(--table->ref_count == 0)
     {
-        free(table);
+        aco_table_dtor(table);
     }
 }
 
@@ -454,6 +471,11 @@ aco_table_evaporate_all(AcoTable        *ftable,
             }
         }
     }
+
+    if(table->callee != NULL)
+    {
+        table->callee((AcoTable*)table, table->callee_arg);
+    }
 }
 
 AcoTableIter
@@ -606,4 +628,22 @@ aco_table_rx_info_update(AcoTable       *ftable,
     {
         return false;
     }
+}
+
+void
+aco_table_register_callee(AcoTable       *ftable,
+                          void            (*callee)(AcoTable* table, void* arg),
+                          void            *callee_arg,
+                          void            (*arg_dtor)(void *arg))
+{
+    RealTable* table = (RealTable*)ftable;
+
+    if(table->arg_dtor != NULL)
+    {
+        table->arg_dtor(table->callee_arg);
+    }
+
+    table->callee           = callee;
+    table->callee_arg       = callee_arg;
+    table->arg_dtor         = arg_dtor;
 }

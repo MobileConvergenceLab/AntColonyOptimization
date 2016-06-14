@@ -33,7 +33,7 @@ typedef struct _AcoTable {
     const aco_ph_t      max;
     const int           max_endurance;
 
-    // For internal Varialbles
+// For internal Varialbles
     const char          data[];
 } AcoTable;
 
@@ -74,6 +74,11 @@ bool            aco_table_rx_info_update    (AcoTable       *table,
                                              aco_id_t       target,
                                              aco_id_t       neigh,
                                              aco_dist_t     dist);
+void            aco_table_register_callee   (AcoTable       *table,
+                                            void            (*callee)(AcoTable* table, void* arg),
+                                            void            *callee_arg,
+                                            void            (*arg_dtor)(void *arg));
+                                             
 
 #ifdef __cpluscplus
 } // extern "C"
