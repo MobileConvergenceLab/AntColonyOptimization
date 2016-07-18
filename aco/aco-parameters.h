@@ -13,7 +13,7 @@
 #define     MONITOR_PERIOD_MS           (1000)
 
 #define     CYCLE_PERIOD_MS             (100)
-#define     NUMBER_OF_CYCLES            (300)
+#define     NUMBER_OF_CYCLES            (50)
 #define     PACKETS_PER_CYCLE           (10)
 
 // time for the send packet
@@ -28,11 +28,11 @@
 #define     ANT_MAXIMUM_TTL             (128)
 
 // Evaporation rate of pheromone
-#define     ANT_EVAPORATION_RATE        (0.10)
+#define     ANT_EVAPORATION_RATE        (0.50)
 #define     ANT_REMAINS_RATE            (1-ANT_EVAPORATION_RATE)
 #define     ANT_COCENTRATION_CONST      (PHEROMONE_MAX*ANT_EVAPORATION_RATE/(double)PACKETS_PER_CYCLE)
 
-#define     ANT_MODEL_SELECTOR          (ant_system_model)
+#define     ANT_MODEL_SELECTOR          (ant_normalizing_model)
 
 // Flgas
 #define     ANT_DESTINATION_UPDATE      (0)

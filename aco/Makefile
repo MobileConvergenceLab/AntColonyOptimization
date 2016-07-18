@@ -1,40 +1,44 @@
 CC          = gcc
+
+INCLUDE     += -I../
+INCLUDE     += `pkg-config --cflags glib-2.0`
+LIBS        += `pkg-config --libs glib-2.0`
+LIBS        += -L../fon -lfon
 CFLAGS      = -c -pthread -std=c99
 CFLAGS      += -Wall -Wno-unused-function
 CFLAGS      += -g
-INCLUDE     = `pkg-config --cflags glib-2.0`
-LIBS        = `pkg-config --libs glib-2.0`
+CFLAGS      += $(INCLUDE)
 
-FONLIB      = fon/int-pair.o fon/fon.o fon/msg_if.o
+LDFLAGS     += $(LIBS)
+
 OBJS        = ant-obj.o aco-table.o ant.o ant-model.o
 SRCS        = $(OBJS:.o=.c)
-TARGETS     = aco
 UNIT_TESTS  = test-obj test-table test-ant
+TARGETS     = aco
+TARGETS     += $(UNIT_TESTS)
 
 .PHONY: all clean
 
-all: $(TARGETS) $(UNIT_TESTS)
+all: $(TARGETS)
 
-aco: $(FONLIB) $(OBJS) main.o
-	$(CC) $^ -o $@ $(LIBS)
+aco: $(OBJS) main.o
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 # Unit test code
-unit-test: $(UNIT_TESTS)
+test-obj: $(OBJS) test-obj.o
+	$(CC) $^ -o $@ $(LDFLAGS)
 
-test-obj: ant-obj.o test-obj.o
-	$(CC) $^ -o $@ $(LIBS)
+test-table: $(OBJS) test-table.o
+	$(CC) $^ -o $@ $(LDFLAGS)
 
-test-table: aco-table.o test-table.o
-	$(CC) $^ -o $@ $(LIBS)
-
-test-ant: ant.o aco-table.o ant-obj.o ant-model.o test-ant.o $(FONLIB)
-	$(CC) $^ -o $@ $(LIBS)
+test-ant: $(OBJS) test-ant.o
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $< $(INCLUDE) $(CFLAGS)
+	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(TARGETS) $(UNIT_TESTS) *.o
+	$(RM) $(TARGETS) $(OBJS) *.o
 
 tag:
 	ctags -n -R
@@ -122,9 +126,9 @@ aco-table.o: aco-table.c /usr/include/stdc-predef.h aco-table.h \
  /usr/include/limits.h /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
  /usr/include/x86_64-linux-gnu/bits/local_lim.h \
  /usr/include/linux/limits.h \
- /usr/include/x86_64-linux-gnu/bits/posix2_lim.h fon/algorithm.h \
+ /usr/include/x86_64-linux-gnu/bits/posix2_lim.h ../fon/algorithm.h \
  aco-parameters.h
-ant.o: ant.c /usr/include/stdc-predef.h fon/packet_if.h \
+ant.o: ant.c /usr/include/stdc-predef.h ../fon/packet_if.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdint.h /usr/include/stdint.h \
  /usr/include/features.h /usr/include/x86_64-linux-gnu/sys/cdefs.h \
  /usr/include/x86_64-linux-gnu/bits/wordsize.h \
@@ -137,7 +141,7 @@ ant.o: ant.c /usr/include/stdc-predef.h fon/packet_if.h \
  /usr/include/_G_config.h /usr/include/wchar.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdarg.h \
  /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
- /usr/include/x86_64-linux-gnu/bits/sys_errlist.h fon/fon.h \
+ /usr/include/x86_64-linux-gnu/bits/sys_errlist.h ../fon/fon.h \
  /usr/include/glib-2.0/glib.h /usr/include/glib-2.0/glib/galloca.h \
  /usr/include/glib-2.0/glib/gtypes.h \
  /usr/lib/x86_64-linux-gnu/glib-2.0/include/glibconfig.h \
@@ -228,13 +232,13 @@ ant.o: ant.c /usr/include/stdc-predef.h fon/packet_if.h \
  /usr/include/x86_64-linux-gnu/bits/select.h \
  /usr/include/x86_64-linux-gnu/sys/sysmacros.h /usr/include/pthread.h \
  /usr/include/sched.h /usr/include/x86_64-linux-gnu/bits/sched.h \
- /usr/include/x86_64-linux-gnu/bits/setjmp.h fon/msg_if.h \
- /usr/include/string.h fon/msg_defs.h fon/packet_if.h fon/table_if.h \
- fon/fon-utils.h /usr/include/stdlib.h \
+ /usr/include/x86_64-linux-gnu/bits/setjmp.h ../fon/msg_if.h \
+ /usr/include/string.h ../fon/msg_defs.h ../fon/packet_if.h \
+ ../fon/table_if.h ../fon/fon-utils.h /usr/include/stdlib.h \
  /usr/include/x86_64-linux-gnu/bits/waitflags.h \
  /usr/include/x86_64-linux-gnu/bits/waitstatus.h /usr/include/alloca.h \
- /usr/include/x86_64-linux-gnu/bits/stdlib-float.h fon/common-defs.h \
- fon/algorithm.h aco-table.h aco-types.h \
+ /usr/include/x86_64-linux-gnu/bits/stdlib-float.h ../fon/common-defs.h \
+ ../fon/algorithm.h aco-table.h aco-types.h \
  /usr/lib/gcc/x86_64-linux-gnu/4.8/include/stdbool.h ant.h ant-def.h \
  aco-parameters.h ant-obj.h ant-model.h main.h cassert.h \
  /usr/include/assert.h /usr/include/arpa/inet.h /usr/include/netinet/in.h \

@@ -67,14 +67,16 @@ def do_kill_aco_node(wait_time, port):
     print '=========================================================='
 
 
-def kill_aco_node(wait_time, port):
-    th = threading.Thread(target=do_kill_aco_node, args=(wait_time, port,))
-    th.start()
+def kill_aco_node(kill, wait_time, port):
+    if(kill == True):
+        th = threading.Thread(target=do_kill_aco_node, args=(wait_time, port,))
+        th.start()
 
 def initiate_aco(hosts, agent, port, logfile):
     NUM_HOST    = len(hosts)
 
-    kill_aco_node(10, 9914)
+    kill = False
+    kill_aco_node(kill, 10, 9914)
 
     i = 0
     for host in hosts:

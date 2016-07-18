@@ -4,12 +4,12 @@ CFLAGS      += -Wall -Werror
 CFLAGS      += -O3
 CFLAGS      += -DNO_DAEMON
 CFLAGS      += `pkg-config --cflags glib-2.0`
-INCLUDE     += -I../
-LIBS        = `pkg-config --libs glib-2.0`
+CFLAGS      += -I../
+LDFLAGS     += `pkg-config --libs glib-2.0`
+LDFLAGS     += -L../fon/ -lfon
 
 SRCS        = node.c table.c ether_link.c packet.c
-OBJS		= $(srcs:%.c=%.o)
-FONLIB      = fon/fon.o fon/int-pair.o fon/msg_if.o
+OBJS		= $(SRCS:%.c=%.o)
 TARGETS     = server
 
 .PHONY: all clean
@@ -17,10 +17,10 @@ TARGETS     = server
 all: $(TARGETS)
 
 server: Main.o $(OBJS) $(FONLIB)
-	$(CC) $^ -o $@ $(LIBS)
+	$(CC) $^ -o $@ $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $< $(INCLUDE) $(CFLAGS)
+	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(targets) *.o
+	$(RM) $(TARGETS) *.o

@@ -1,23 +1,29 @@
 CC          = gcc
+
+INCLUDE     += `pkg-config --cflags glib-2.0`
+LIBS        += `pkg-config --libs glib-2.0`
+
 CFLAGS      += -c -pthread -std=c99
 CFLAGS      += -Wall -Werror
 CFLAGS      += -g
 #CFLAGS      += -O3
-CFLAGS      += `pkg-config --cflags glib-2.0`
-LDFLAGS     += `pkg-config --libs glib-2.0`
+CFLAGS      += $(INCLUDE)
+LDFLAGS     += $(LIBS)
 
 SRCS        = msg_if.c fon.c int-pair.c msg_if.c
 OBJS		= $(SRCS:%.c=%.o)
-TARGETS     = test-int-pair libfon.a
+
+FONLIB      = libfon.a
+TARGET      = test-int-pair
 
 .PHONY: all clean
 
-all: $(TARGETS)
+all: $(FONLIB) $(TARGETS)
 
-test-int-pair:  test-int-pair.o $(OBJS)
+$(TARGET):  test-int-pair.o $(OBJS)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-libfon.a: $(OBJS)
+$(FONLIB): $(OBJS)
 	ar rc $@ $^
 
 %.o: %.c

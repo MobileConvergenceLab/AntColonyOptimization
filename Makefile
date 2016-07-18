@@ -2,14 +2,14 @@ EXCLUDE = --exclude=.test-ipc --exclude=.test-sendrecv --exclude=.scipts --exclu
 
 all:
 	cd ./fon && make
-	cd ./src && make
+	cd ./fond && make
 	cd ./aco && make
 
 tag:
 	ctags -R $(EXCLUDE)
 
 clean:
-	cd ./fon && make clean
-	cd ./src && make clean
 	cd ./aco && make clean
+	cd ./fond && make clean
+	cd ./fon && make clean
 
