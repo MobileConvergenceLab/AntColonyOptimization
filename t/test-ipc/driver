@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+xterm -e ./test_ipc &
+sleep 2
+./main

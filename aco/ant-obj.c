@@ -13,7 +13,7 @@
  * Private Declaration
  *==============================================================================*/
 #define _INVALID_VALUE                  (-1)
-#define ANT_OBJ_MAXIMUM_ARR_SIZE        (ANT_MAXIMUM_TTL)
+#define ANT_OBJ_MAXIMUM_ARR_SIZE        (ACO_DIST_MAX)
 #define _MAGIC_INDEX                    (ANT_OBJ_MAXIMUM_ARR_SIZE)
 
 static const char _DirectionString[][64] = {
@@ -42,9 +42,9 @@ struct _RealObject {
     aco_id_t        destination;
 
     // Internal Variables
-    int             direction;
-    int             ini_ttl;
-    int             cur_ttl;
+    aco_direction_t direction;
+    aco_ttl_t       ini_ttl;
+    aco_ttl_t       cur_ttl;
     int             nwalk;
     int             npath;
     int             nvisited;
@@ -58,11 +58,11 @@ struct _RealObject {
 
 
 struct __attribute__((packed)) _AntObjectMarshalled {
-    uint16_t    source;
-    uint16_t    destination;
-    uint16_t    direction;
-    uint16_t    ini_ttl;
-    uint16_t    cur_ttl;
+    aco_id_packed_t            source;
+    aco_id_packed_t            destination;
+    aco_direction_packed_t     direction;
+    aco_ttl_packed_t           ini_ttl;
+    aco_ttl_packed_t           cur_ttl;
     uint16_t    nwalk;
     uint16_t    npath;
     uint16_t    nvisited;
@@ -121,7 +121,7 @@ _init_ids(aco_id_t      *ids)
 {
     for(int i=0; i< ANT_OBJ_MAXIMUM_ARR_SIZE+1; i++)
     {
-        ids[i] = _INVALID_VALUE;
+        ids[i] = ACO_ID_WRONG;
     }
 }
 
@@ -163,7 +163,7 @@ _pop_ids(aco_id_t       *ids,
         /* exceed array boundary */
         abort();
     }
-    ids[--(*len)] = _INVALID_VALUE;
+    ids[--(*len)] = ACO_ID_WRONG;
 }
 #define _pop_path(obj)                                  _pop_ids((obj->path),     &(obj->npath))
 #define _pop_walk(obj)                                  _pop_ids((obj->walk),   &(obj->nwalk))
@@ -255,7 +255,7 @@ _find_visited_idx(const aco_id_t    *visited,
 
     *(aco_id_t*)(visited+_MAGIC_INDEX) = id;
     while(visited[++idx] != id);
-    *(aco_id_t*)(visited+_MAGIC_INDEX) = _INVALID_VALUE;
+    *(aco_id_t*)(visited+_MAGIC_INDEX) = ACO_ID_WRONG;
 
     return idx;
 }
@@ -430,11 +430,11 @@ void ant_object_marshalling(const AntObject *fobj, void **pos, int *reamin)
         *pos    += len;
     }
 
-    marshalled->source      = htons(in_obj->source);
-    marshalled->destination = htons(in_obj->destination);
-    marshalled->direction   = htons(in_obj->direction);
-    marshalled->ini_ttl     = htons(in_obj->ini_ttl);
-    marshalled->cur_ttl     = htons(in_obj->cur_ttl);
+    marshalled->source      = ACO_ID_PACK(in_obj->source);
+    marshalled->destination = ACO_ID_PACK(in_obj->destination);
+    marshalled->direction   = ACO_DIRECTION_PACK(in_obj->direction);
+    marshalled->ini_ttl     = ACO_TTL_PACK(in_obj->ini_ttl);
+    marshalled->cur_ttl     = ACO_TTL_PACK(in_obj->cur_ttl);
     marshalled->nwalk       = htons(in_obj->nwalk);
     marshalled->npath       = htons(in_obj->npath);
     marshalled->nvisited    = htons(in_obj->nvisited);
@@ -456,11 +456,11 @@ ant_object_demarshalling(const void     *in_buf,
     const AntObjectMarshalled*
                     marshalled = in_buf;
 
-    RealObject*         obj         = _real_object_new(ntohs(marshalled->source),
-                                        ntohs(marshalled->destination),
-                                        ntohs(marshalled->direction),
-                                        ntohs(marshalled->ini_ttl),
-                                        ntohs(marshalled->cur_ttl)
+    RealObject*         obj         = _real_object_new(ACO_ID_UNPACK(marshalled->source),
+                                        ACO_ID_UNPACK(marshalled->destination),
+                                        ACO_DIRECTION_UNPACK(marshalled->direction),
+                                        ACO_TTL_UNPACK(marshalled->ini_ttl),
+                                        ACO_TTL_UNPACK(marshalled->cur_ttl)
                                         );
 
     obj->nwalk      = ntohs(marshalled->nwalk);
@@ -574,7 +574,7 @@ ant_object_from(const AntObject* fobj)
     }
     else
     {
-        return _INVALID_VALUE;
+        return ACO_ID_WRONG;
     }
 }
 
@@ -654,7 +654,7 @@ _forward_op_previous(const RealObject    *obj)
 
     if(npath == 1)
     {
-        return _INVALID_VALUE;
+        return ACO_ID_WRONG;
     }
 
     assert(npath-2 >= 0);
@@ -664,7 +664,7 @@ _forward_op_previous(const RealObject    *obj)
 aco_id_t
 _forward_op_next(const RealObject   *obj)
 {
-    return _INVALID_VALUE;
+    return ACO_ID_WRONG;
 }
 
 
@@ -701,7 +701,7 @@ _backward_op_previous(const RealObject       *obj)
 {
     if(obj->ini_ttl == obj->cur_ttl)
     {
-        return _INVALID_VALUE;
+        return ACO_ID_WRONG;
     }
     else
     {
@@ -718,7 +718,7 @@ _backward_op_next(const RealObject      *obj)
 
     if(cur_idx == 0)
     {
-        return _INVALID_VALUE;
+        return ACO_ID_WRONG;
     }
     return obj->path[cur_idx - 1];
 }

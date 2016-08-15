@@ -1,33 +1,38 @@
 CC          = gcc
 
-INCLUDE     += `pkg-config --cflags glib-2.0`
-LIBS        += `pkg-config --libs glib-2.0`
+WARNINGS    += -W -Wall -Wshadow
+WARNINGS    += -Wno-unused-function
+WARNINGS    += -Wno-unused-parameter
+WARNINGS    += -Werror
 
-CFLAGS      += -c -pthread -std=c99
-CFLAGS      += -Wall -Werror
+CFLAGS      += -c
+CFLAGS      += -pthread
+CFLAGS      += -std=c99
 CFLAGS      += -g
 #CFLAGS      += -O3
+CFLAGS      += -DDEBUG
 CFLAGS      += $(INCLUDE)
-LDFLAGS     += $(LIBS)
+CFLAGS      += $(WARNINGS)
 
-SRCS        = msg_if.c fon.c int-pair.c msg_if.c
+SRCS        = array.c hexdump.c fon_ipc.c fon.c fon_test.c
 OBJS		= $(SRCS:%.c=%.o)
 
 FONLIB      = libfon.a
-TARGET      = test-int-pair
 
-.PHONY: all clean
+.PHONY: all clean re-build
 
-all: $(FONLIB) $(TARGETS)
-
-$(TARGET):  test-int-pair.o $(OBJS)
-	$(CC) $^ -o $@ $(LDFLAGS)
+all: $(FONLIB)
 
 $(FONLIB): $(OBJS)
 	ar rc $@ $^
 
 %.o: %.c
-	$(CC) $< -DNO_DAEMON $(CFLAGS)
+	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(TARGETS) *.o
+	$(RM) $(OBJS) $(FONLIB)
+
+re-build:
+	make clean
+	make
+

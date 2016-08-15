@@ -5,10 +5,10 @@
 #include <string.h>
 #include <limits.h>
 
-#include "fon/algorithm.h"
-#include "aco-parameters.h"
+#include <fon/fon_defs.h>
+#include "aco-policies.h"
 
-#define ACO_TABLE_UNDEFINED_DIST        (ACO_DIST_MAX)
+#define _WRONG_IDX (-1)
 
 /*==============================================================================
  * Private Type Declarations
@@ -22,7 +22,12 @@ typedef struct _RealValue {
     int         tx_count;
     int         rx_count;
     int         dead_count;
+
     bool        never_visited;
+
+    // For a given target(destination),
+    // each neighbor node has a minimum distance to reach the target.
+    // This value defined as local_min{target}{neighbor}.
     aco_dist_t  local_min;
 
 // Internal Variables
@@ -40,18 +45,28 @@ typedef struct _RealTable {
 
 // Internal Variables
     int                 ref_count;
-    int                 nrow;
-    int                 ncol;
-    aco_id_t            col_to_neigh[ACO_TABLE_MAX_COL + 1];
-    aco_id_t            row_to_target[ACO_TABLE_MAX_ROW + 1];
-    aco_dist_t          global_mins[ACO_TABLE_MAX_ROW];
-    RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
 
-    // called when aco_table_evaporate_all() is called
-    void            (*callee)(AcoTable* table, void* arg);
-    void            *callee_arg;
-    /// called when table object is destroyed.
-    void            (*arg_dtor)(void *arg);
+    // The current number of row(= target)
+    int                 nrow;
+
+    // The current number of col(= neighbor)
+    int                 ncol;
+
+    // table, array index to neighbor's id
+    aco_id_t            col_to_neigh[ACO_TABLE_MAX_COL + 1];
+
+    // table, array index to target's id
+    aco_id_t            row_to_target[ACO_TABLE_MAX_ROW + 1];
+
+    // global_min is defined as for a given target,
+    // the mimimum value of local_min{target}{neighbor}.
+    // this table is a set of cached values of global_min according to target.
+    aco_dist_t          global_mins[ACO_TABLE_MAX_ROW];
+
+    RealValue           array[ACO_TABLE_MAX_ROW][ACO_TABLE_MAX_COL];
+    evapor_cbfunc_t     evapor_cbfunc;
+    evapor_cbarg_t      evapor_cbarg;
+    evapor_dtor_t       evapor_dtor;
 } RealTable;
 
 /*==============================================================================
@@ -75,7 +90,7 @@ aco_value_init(RealValue    *value,
     value->dead_count       = 0;
     value->never_visited    = true;
 
-    value->local_min        = ACO_TABLE_UNDEFINED_DIST,
+    value->local_min        = ACO_DIST_WRONG;
     value->row              = row;
     value->col              = col;
     value->endurance        = max_endurance;
@@ -87,7 +102,7 @@ _init_ids(aco_id_t      *idx_to_id,
 {
     for(int idx=0; idx<cap; idx++)
     {
-        idx_to_id[idx] = -1;
+        idx_to_id[idx] = ACO_ID_WRONG;
     }
 }
 
@@ -97,7 +112,7 @@ _init_dists(aco_dist_t      *idx_to_dist,
 {
     for(int idx=0; idx<cap; idx++)
     {
-        idx_to_dist[idx] = ACO_TABLE_UNDEFINED_DIST;
+        idx_to_dist[idx] = ACO_DIST_WRONG;
     }
 }
 
@@ -106,13 +121,13 @@ _find_idx(aco_id_t       *idx_to_id,
           int            cap,
           aco_id_t       id)
 {
-    int idx = -1;
+    int idx = _WRONG_IDX;
 
     idx_to_id[cap] = id;
     while(idx_to_id[++idx] != id);
-    idx_to_id[cap] = -1;
+    idx_to_id[cap] = ACO_ID_WRONG;
 
-    return idx == cap ? -1 : idx;
+    return idx == cap ? _WRONG_IDX : idx;
 }
 #define _FIND_COL(table, id)    _find_idx(table->col_to_neigh, ACO_TABLE_MAX_COL, id)
 #define _FIND_ROW(table, id)    _find_idx(table->row_to_target, ACO_TABLE_MAX_ROW, id)
@@ -120,7 +135,7 @@ _find_idx(aco_id_t       *idx_to_id,
 static void
 _aco_table_re_cache_global_min(RealTable *table, int row)
 {
-    int global_min = ACO_TABLE_UNDEFINED_DIST;
+    int global_min = ACO_DIST_WRONG;
 
     for(int col=0; col < table->ncol; col++)
     {
@@ -155,7 +170,7 @@ _aco_value_get(RealTable    *table,
     int row = _FIND_ROW(table, target);
     int col = _FIND_COL(table, neigh);
 
-    if(row == -1 || col == -1)
+    if(row == _WRONG_IDX || col == _WRONG_IDX)
     {
         return NULL;
     }
@@ -163,6 +178,17 @@ _aco_value_get(RealTable    *table,
     {
         return &table->array[row][col];
     }
+}
+
+static void
+_aco_table_dtor(RealTable        *table)
+{
+    if(table->evapor_dtor != NULL)
+    {
+        table->evapor_dtor(table->evapor_cbarg);
+    }
+
+    free(table);
 }
 
 /*==============================================================================
@@ -176,10 +202,10 @@ aco_table_new(aco_id_t      host,
 {
     RealTable* table = malloc(sizeof(RealTable));
 
-    *(aco_id_t*)&table->host      = host;
+    *(aco_id_t*)&table->host           = host;
     *(aco_ph_t*)&table->min_pheromone  = min;
     *(aco_ph_t*)&table->max_pheromone  = max;
-    *(int*)&table->max_endurance= max_endurance;
+    *(int*)&table->max_endurance       = max_endurance;
 
     table->ref_count = 1;
     table->nrow      = 0;
@@ -188,9 +214,9 @@ aco_table_new(aco_id_t      host,
     _init_ids(table->row_to_target,     sizeof(table->row_to_target));
     _init_dists(table->global_mins,     sizeof(table->global_mins));
 
-    table->callee       = NULL;
-    table->callee_arg   = NULL;
-    table->arg_dtor     = NULL;
+    table->evapor_cbfunc  = NULL;
+    table->evapor_cbarg   = NULL;
+    table->evapor_dtor    = NULL;
 
     return (AcoTable*)table;
 }
@@ -205,13 +231,6 @@ aco_table_ref(AcoTable      *ftable)
     return (AcoTable*)table;
 }
 
-static void
-aco_table_dtor(RealTable        *table)
-{
-    table->arg_dtor(table->callee_arg);
-    free(table);
-}
-
 void
 aco_table_unref(AcoTable        *ftable)
 {
@@ -219,7 +238,7 @@ aco_table_unref(AcoTable        *ftable)
 
     if(--table->ref_count == 0)
     {
-        aco_table_dtor(table);
+        _aco_table_dtor(table);
     }
 }
 
@@ -230,8 +249,8 @@ aco_table_add_target(AcoTable      *ftable,
     RealTable* table = (RealTable*)ftable;
 
     if(target == table->host            ||
-       _FIND_ROW(table, target)    != -1   ||
-       _FIND_COL(table, target)    != -1)
+       _FIND_ROW(table, target)    != _WRONG_IDX   ||
+       _FIND_COL(table, target)    != _WRONG_IDX)
     {
         return false;
     }
@@ -267,8 +286,8 @@ aco_table_add_neigh(AcoTable      *ftable,
     RealTable* table = (RealTable*)ftable;
 
     if(neigh == table->host            ||
-       _FIND_ROW(table, neigh)    != -1   ||
-       _FIND_COL(table, neigh)    != -1)
+       _FIND_ROW(table, neigh)    != _WRONG_IDX   ||
+       _FIND_COL(table, neigh)    != _WRONG_IDX)
     {
         return false;
     }
@@ -297,18 +316,18 @@ aco_table_add_neigh(AcoTable      *ftable,
     return true;
 }
 
-int
+aco_dist_t
 aco_table_global_min(AcoTable       *ftable,
                      aco_id_t       target)
 {
     RealTable* table = (RealTable*)ftable;
 
-    int         global_min  = ACO_TABLE_UNDEFINED_DIST;
+    aco_dist_t  global_min  = ACO_DIST_WRONG;
     int         ncol        = table->ncol;
     int         row         = _FIND_ROW(table, target);
-    int         col         = -1;
+    int         col         = _WRONG_IDX;
 
-    if(row == -1)
+    if(row == _WRONG_IDX)
     {
         goto RETURN;
     }
@@ -328,6 +347,51 @@ RETURN:
     return global_min;
 }
 
+
+// 페로몬 최대값을 갖는 인접 노드의 id를 반환한다.
+aco_id_t
+aco_table_max_pheromon(AcoTable       *ftable,
+                       aco_id_t       target,
+                       AcoValue       *value)
+{
+    RealTable* table = (RealTable*)ftable;
+
+    aco_dist_t  neighbor    = ACO_ID_WRONG;
+    aco_ph_t    max_ph      = 0.0;
+    int         max_ph_col  = _WRONG_IDX;
+    int         ncol        = table->ncol;
+    int         row         = _FIND_ROW(table, target);
+    int         col         = _WRONG_IDX;
+
+    if(row == _WRONG_IDX)
+    {
+        goto RETURN;
+    }
+
+    if(aco_table_is_neigh(ftable, target))
+    {
+        goto RETURN;
+    }
+
+    for(col=0; col< ncol; col++)
+    {
+        if(max_ph < table->array[row][col].pheromone)
+        {
+            max_ph = table->array[row][col].pheromone;
+            neighbor = table->array[row][col].neigh;
+            max_ph_col = col;
+	}
+    }
+
+RETURN:
+    if(value != NULL && neighbor != ACO_ID_WRONG)
+    {
+        *value = *(AcoValue*)(&table->array[row][max_ph_col]);
+    }
+
+    return neighbor;
+}
+
 bool
 aco_table_is_neigh(AcoTable     *ftable,
                    aco_id_t     id)
@@ -335,7 +399,7 @@ aco_table_is_neigh(AcoTable     *ftable,
     RealTable* table = (RealTable*)ftable;
 
     if(id == table->host ||
-       _FIND_COL(table, id)    == -1)
+       _FIND_COL(table, id)    == _WRONG_IDX)
     {
         return false;
     }
@@ -350,7 +414,7 @@ aco_table_is_target(AcoTable        *ftable,
     RealTable* table = (RealTable*)ftable;
 
     if(id == table->host ||
-       _FIND_ROW(table, id)    == -1)
+       _FIND_ROW(table, id)    == _WRONG_IDX)
     {
         return false;
     }
@@ -379,8 +443,9 @@ aco_table_print_all(AcoTable        *ftable)
         printf("<%3d>   ", table->row_to_target[row]);
         for(int col=0; col<table->ncol; col++)
         {
-            int local_min = table->array[row][col].local_min;
-            local_min = local_min != ACO_TABLE_UNDEFINED_DIST ? local_min : -1;
+            aco_dist_t local_min = table->array[row][col].local_min;
+
+            local_min = (local_min == ACO_DIST_WRONG ? -1 : local_min);
             printf("%05.2f %4d %4d  %2d   ",
                     table->array[row][col].pheromone,
                     table->array[row][col].tx_count,
@@ -450,13 +515,14 @@ aco_table_evaporate_all(AcoTable        *ftable,
             {
                 // Clear all column in given row.
 
-                for(int col=0; col<table->ncol; col++)
+                for(int inner_col=0; inner_col < table->ncol; inner_col++)
                 {
-                    value = &table->array[row][col];
+                    value = &table->array[row][inner_col];
+
                     value->pheromone        = table->min_pheromone;
                     value->dead_count       += 1;
                     value->never_visited    = true;
-                    value->local_min        = ACO_TABLE_UNDEFINED_DIST;
+                    value->local_min        = ACO_DIST_WRONG;
                     value->endurance        = table->max_endurance;
 
                     _aco_value_set(table, value, false/* for lazy evaluation */);
@@ -472,9 +538,9 @@ aco_table_evaporate_all(AcoTable        *ftable,
         }
     }
 
-    if(table->callee != NULL)
+    if(table->evapor_cbfunc != NULL)
     {
-        table->callee((AcoTable*)table, table->callee_arg);
+        table->evapor_cbfunc((AcoTable*)table, table->evapor_cbarg);
     }
 }
 
@@ -484,7 +550,7 @@ aco_table_iter_begin(AcoTable       *ftable,
 {
     RealTable       *table  = (RealTable*)ftable;
     AcoTableIter    iter    = {.value = {0},
-                               .index = -1,
+                               .col = _WRONG_IDX,
                                .valid = false};
 
     if(table->ncol == 0)
@@ -499,8 +565,9 @@ aco_table_iter_begin(AcoTable       *ftable,
     }
 
     iter.value = *(AcoValue*)&table->array[row][0];
-    *(int*)&iter.index = 0;
-    *(bool*)&iter.valid = true;
+
+    iter.col = 0;
+    iter.valid = true;
 
 RETURN:
     return iter;
@@ -519,26 +586,27 @@ aco_table_iter_next(AcoTable        *ftable,
     RealTable* table = (RealTable*)ftable;
 
     int row = _FIND_ROW(table, iter->value.target);;
-    int index = iter->index;
+    int col = iter->col;
 
-    if(row == -1)
+    if(row == _WRONG_IDX)
     {
-        *(int*)&iter->index = -1;
+        *(int*)&iter->col = _WRONG_IDX;
         *(bool*)&iter->valid = false;
         return false;
     }
 
-    if(index < 0 ||
-       index == table->ncol-1)
+    if(col < 0 ||
+       col == table->ncol-1)
     {
-        *(int*)&iter->index = -1;
+        *(int*)&iter->col = _WRONG_IDX;
         *(bool*)&iter->valid = false;
         return false;
     }
 
-    index++;
-    iter->value = *(AcoValue*)&table->array[row][index];
-    *(int*)&iter->index = index;
+    col++;
+
+    iter->value = *(AcoValue*)&table->array[row][col];
+    iter->col = col;
 
     return true;
 }
@@ -588,10 +656,8 @@ aco_table_tx_info_update(AcoTable       *ftable,
         value->tx_count     += 1;
 
 #if ENDURANCE_ENABLE
-#pragma message("Enable Enduracne")
         value->endurance    -= 1;
 #else
-#pragma message("Disable Enduracne")
         value->endurance    = 1;
 #endif /* ENDURANCE_ENABLE */
 
@@ -632,18 +698,18 @@ aco_table_rx_info_update(AcoTable       *ftable,
 
 void
 aco_table_register_callee(AcoTable       *ftable,
-                          void            (*callee)(AcoTable* table, void* arg),
-                          void            *callee_arg,
-                          void            (*arg_dtor)(void *arg))
+                          evapor_cbfunc_t evapor_cbfunc,
+                          evapor_cbarg_t  evapor_cbarg,
+                          evapor_dtor_t   evapor_dtor)
 {
     RealTable* table = (RealTable*)ftable;
 
-    if(table->arg_dtor != NULL)
+    if(table->evapor_dtor != NULL)
     {
-        table->arg_dtor(table->callee_arg);
+        table->evapor_dtor(table->evapor_cbarg);
     }
 
-    table->callee           = callee;
-    table->callee_arg       = callee_arg;
-    table->arg_dtor         = arg_dtor;
+    table->evapor_cbfunc      = evapor_cbfunc;
+    table->evapor_cbarg       = evapor_cbarg;
+    table->evapor_dtor        = evapor_dtor;
 }

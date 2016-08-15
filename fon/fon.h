@@ -1,29 +1,36 @@
-/* library for FON Client */
+#ifndef FCLIENT_H
+#define FCLIENT_H
 
-#include <glib.h>
+/* fclien.h
+ * library for FON Client
+ */
 
-#include "msg_if.h"
-#include "msg_defs.h"
-#include "fon-utils.h"
-#include "common-defs.h"
-
-typedef gboolean (*FonCallbackRecv)     (const packet *pkt, gpointer user_data);
-typedef gboolean (*FonCallbackHost)     (gpointer user_data);
-typedef gboolean (*FonCallbackTable)    (gpointer user_data);
-
-gboolean fon_init(GMainContext *context, int in_type ,int in_port);
-gboolean fon_sendto(packet *pkt);
-gboolean fon_table_add(table_tuple *tuple);
-gboolean fon_table_del(int id);
-gboolean fon_table_get(GArray **tuple_array);
-gboolean fon_host_get(int *in_id);
-int      fon_get_type();
-void fon_set_callback_recv(FonCallbackRecv recv_callback, gpointer user_data);
+#include "array.h"
+#include "fon_defs.h"
+#include "fon_ipc.h"
+#include "fon_client.h"
 
 
+FON_BEGIN_EXTERN_C
 
-// TODO
-/* 데몬에서 호스트id가 변경되면 등록한 콜백함수가 호출됨 */
-void fon_set_callback_host(FonCallbackRecv host_callback, gpointer user_data);
-/* 데몬에서 테이블이 변경되면 등록한 콜백함수가 호출됨 */
-void fon_set_callback_table(FonCallbackRecv table_callback, gpointer user_data);
+FonClient*  fon_client_new              (fon_type_t     in_type,
+                                         int            in_port);
+bool        fon_sendto                  (FonClient      *client,
+                                         packet_hdr_t   *hdr);
+int         fon_recvfrom                (FonClient      *client,
+                                         packet_hdr_t   *hdr,
+                                         int            buflen);
+bool        fon_table_add               (FonClient      *client,
+                                         fib_tuple_t    *tuple);
+bool        fon_table_del               (FonClient      *client,
+                                         fon_id_t       id);
+bool        fon_table_get               (FonClient      *client,
+                                         Array          **tuple_array);
+bool        fon_host_get                (FonClient      *client,
+                                         fon_id_t       *out_id);
+fon_type_t  fon_get_type                (FonClient      *client);
+
+
+FON_END_EXTERN_C
+
+#endif /* FCLIENT_H */

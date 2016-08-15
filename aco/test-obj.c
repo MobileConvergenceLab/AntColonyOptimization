@@ -1,8 +1,8 @@
-#include "ant-obj.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
+#include "ant-obj.h"
+#include "test.h"
 
 void my_object_assert(AntObject* obj, int in_direction, int in_previous, int in_from, int in_next, int in_nhops, bool in_is_backtrackted)
 {
@@ -13,12 +13,12 @@ void my_object_assert(AntObject* obj, int in_direction, int in_previous, int in_
     int nhops           = ant_object_dist(obj);
     bool is_backtrackted = ant_object_is_backtracked(obj);
 
-    assert(direction    == in_direction);
-    assert(previous     == in_previous);
-    assert(from         == in_from);
-    assert(next         == in_next);
-    assert(nhops        == in_nhops);
-    assert(is_backtrackted == in_is_backtrackted);
+    TEST(direction    == in_direction);
+    TEST(previous     == in_previous);
+    TEST(from         == in_from);
+    TEST(next         == in_next);
+    TEST(nhops        == in_nhops);
+    TEST(is_backtrackted == in_is_backtrackted);
 }
 
 AntObject* ant_object_new_test()
@@ -165,11 +165,14 @@ int main()
 {
     AntObject* obj = NULL;
 
+    // first test: create object and object's behavior
     obj = ant_object_new_test();
+
+    // second test: masharling(serialization)
     test_masharling(obj);
 
     printf("Test Successful\n");
-    ant_object_print(obj);
+    //ant_object_print(obj);
 
     ant_object_unref(obj);
     return 0;

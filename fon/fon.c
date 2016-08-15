@@ -5,74 +5,24 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+
 #include <stdio.h>
+#include <assert.h>
 
-#include <glib.h>
-#include <glib-unix.h>
-
+#include "array.h"
+#include "hexdump.h"
 #include "fon.h"
-#include "msg_if.h"
-#include "msg_defs.h"
-#include "fon-utils.h"
-#include "common-defs.h"
+#include "fon_dbg.h"
 
-#define LISTEN_MAX      (10)
-
-typedef struct _CallbackFuncs {
-    FonCallbackRecv     callback_recv;
-} CallbackFuncs;
-
-typedef struct _CallbackArgs {
-    gpointer            recv_arg;
-} CallbackArgs;
-
-
-/**
- *  @context: asynchronous message를 처리하기 위한 context
- *  @sync_sock: daemon server에 대한 소켓
- *  @sync_port:
- *  @fucn_type:
- *  @callback: asynchronous message를 처리하는
- *           사용자 정의 함수포인터를 담고 있는 구조체
- */
-typedef struct _FonLib {
-    GMainContext        *context;
-    gboolean            initiated;
-    int                 sync_sock;
-    int                 sync_port;
-    int                 deliver_sock;
-    int                 deliver_port;
-    int                 fucn_type;
-    CallbackFuncs       callbacks;
-    CallbackArgs        args;
-    
-} FonLib;
-
-static FonLib __fon_lib = {
-    .context        = NULL,
-    .initiated      = FALSE,
-    .sync_sock      = -1,
-    .sync_port      = -1,
-    .deliver_sock   = -1,
-    .deliver_port   = -1,
-    .fucn_type      = -1,
-    .callbacks      = {0,},
-};
-
-static gboolean __init_callbacks(CallbackFuncs *funcs) {
-    memset(funcs, 0, sizeof(CallbackFuncs));
-
-    return TRUE;
-}
-
-static gboolean __connect(int *out_fd, int in_port) {
+static bool
+__sync_connect(int *out_fd, int in_port) {
     struct sockaddr_in  addr        = {};
     socklen_t           len         = sizeof(struct sockaddr_in);
 
     *out_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(*out_fd < 0) {
         perror("socket()");
-        return FALSE;
+        return false;
     }
 
     addr.sin_family = AF_INET;
@@ -81,20 +31,21 @@ static gboolean __connect(int *out_fd, int in_port) {
 
     if(connect(*out_fd, (struct sockaddr*)&addr, len) == -1) {
         perror("connect()");
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
-static gboolean __deliver_open(int *out_fd, int *out_port) {
+static bool
+__async_open(int *out_fd, int *out_port) {
     struct sockaddr_in  addr        = {};
     socklen_t           len         = sizeof(struct sockaddr_in);
 
     *out_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(*out_fd < 0) {
         perror("socket()");
-        return FALSE;
+        return false;
     }
 
     addr.sin_family = AF_INET;
@@ -115,252 +66,272 @@ static gboolean __deliver_open(int *out_fd, int *out_port) {
     }
     *out_port = ntohs(addr.sin_port);
 
-    return TRUE;
+    return true;
 }
 
 
-static gboolean __reg(int sync_sock, int func_type, int deliver_port)
+static bool
+__reg(int sync_sock, fon_type_t func_type, int async_port)
 {
-    msg_rsp     rsp;
-    msg_req     req;
+    msg_rsp_reg_t     rsp;
+    msg_req_reg_t     req;
 
     req.hdr.func_type   = func_type;
     req.hdr.msg_type    = MSG_TYPE_REG;
-    req.hdr.tot_len     = sizeof(msg_req_reg);
-    req.reg.deliver_port = deliver_port;
+    req.hdr.tot_len     = sizeof(msg_req_reg_t);
+    req.async_port      = async_port;
 
-    msg_send_req(sync_sock, &req);
-    msg_recv_rsp(sync_sock, &rsp);
+    msg_req_send(sync_sock, &req.hdr);
+    msg_rsp_recv(sync_sock, &rsp.hdr, sizeof(msg_rsp_reg_t));
 
-    return rsp.hdr.result;
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-static gboolean __async_msg_handler(gint            fd,
-                                    GIOCondition    condition,
-                                    gpointer        user_data) {
+static void
+__init_client(FonClient    *client,
+              fon_type_t   in_type,
+              int          in_port)
+{
+    //TODO: type 범위 체크!
 
-    int                 recvbyte;
-    packet              pkt;
-    struct sockaddr_in  addr;
-    socklen_t           len = sizeof(struct sockaddr_in);
-
-    memset(&pkt, 0, sizeof(packet));
-    recvbyte = recvfrom(__fon_lib.deliver_sock,
-                        &pkt,
-                        sizeof(packet),
-                        MSG_WAITALL,
-                        (struct sockaddr*)&addr,
-                        &len);
-
-    if(recvbyte != sizeof(packet)) {
-        /* 데몬과의 통신이 끊어짐 */
-        return FALSE;
+    if(in_port == 0)
+    {
+        in_port = FON_IPC_LISTEN_PORT;
     }
 
-    g_assert(pkt.hdr.pkt_type == __fon_lib.fucn_type);
-
-    if(__fon_lib.callbacks.callback_recv != NULL) {
-        __fon_lib.callbacks.callback_recv(&pkt, __fon_lib.args.recv_arg);
-    }
-
-    return TRUE;
+    client->func_type       = in_type;
+    client->sync_port       = in_port;
 }
 
-static gboolean __attach_async_msg_handler_source() {
-    GSource         *in_source  = NULL;
-    int             src_id;
 
-    in_source = g_unix_fd_source_new(__fon_lib.deliver_sock, G_IO_IN);
-    if(in_source == NULL) {
-        perror("g_unix_fd_source_new()");
-        exit(EXIT_FAILURE);
+FonClient*
+__fon_client_malloc0_try()
+{
+    FonClient *client = malloc(sizeof(FonClient));
+    if(client == NULL)
+    {
+        exit(-1);
     }
+    
+    client->sync_sock       = -1;
+    client->sync_port       = -1;
+    client->async_sock      = -1;
+    client->async_port      = -1;
+    client->func_type       = -1;
 
-    g_source_set_callback (in_source,
-                     (GSourceFunc) __async_msg_handler,
-                     NULL,
-                     NULL);
-    src_id = g_source_attach(in_source, __fon_lib.context);
-    g_source_unref(in_source);
-    if(src_id < 0) {
-        return FALSE;
-    }
-    return TRUE;
+    return client;
 }
 
-static gboolean __init_obj(FonLib *obj, GMainContext *context,
-                            int in_type ,int in_port)
+static bool    
+__connect_client(FonClient    *client)
 {
     int                 sync_sock       = -1;
-    int                 sync_port       = -1;
-    int                 deliver_sock    = -1;
-    int                 deliver_port    = -1;
-    int                 fucn_type       = -1;       /* FON Func type */
-    CallbackFuncs       callbacks;
+    int                 async_sock      = -1;
+    int                 async_port      = -1;
+    bool                ret;
+    __attribute__((unused))
+    char                *err_str        = NULL;
 
-    if(in_port != 0) {
-        sync_port = in_port;
-    }
-    else {
-        sync_port = FON_CORE_LISTEN_PORT;
-    }
-
-    //TODO: type 범위 체크!
-    fucn_type = in_type;
-
-    if(!__connect(&sync_sock, sync_port)) {
-        return FALSE;
+    if(!__sync_connect(&sync_sock, client->sync_port)) {
+        err_str = "__sync_connect(), Please Check fon-daemon server";
+        ret = false;
+        goto ERROR;
     }
 
-    if(!__deliver_open(&deliver_sock, &deliver_port)) {
-        return FALSE;
+    if(!__async_open(&async_sock, &async_port)) {
+        err_str = "__async_open(), Please Check fon-daemon server";
+        ret = false;
+        goto ERROR;
     }
 
-    if(!__reg(sync_sock, fucn_type, deliver_port)) {
-        return FALSE;
+    if(!__reg(sync_sock, client->func_type, async_port)) {
+        err_str = "__reg()";
+        ret = false;
+        goto ERROR;
     }
 
-    if(!__init_callbacks(&callbacks)) {
-        return FALSE;
-    }
+    client->sync_sock       = sync_sock;
+    client->async_sock      = async_sock;
+    client->async_port      = async_port;
 
-    obj->context   = context;
-    g_main_context_ref(obj->context);
+    ret = true;
+    goto RETURN;
 
-    obj->sync_sock      = sync_sock;
-    obj->sync_port      = sync_port;
-    obj->deliver_sock   = deliver_sock;
-    obj->deliver_port   = deliver_port;
-    obj->fucn_type      = fucn_type;
-    obj->callbacks      = callbacks;
-    obj->initiated      = TRUE;
+ERROR:
+//    //dbg("Error(%s)", err_str);
+    close(sync_sock);
+    close(async_sock);
 
-    return TRUE;
+RETURN:
+    return ret;
 }
 
 
 /*==============================================================================
  *
  *==============================================================================*/
-gboolean fon_init(GMainContext *context, int in_type ,int in_port) {
+FonClient*
+fon_client_new(fon_type_t in_type ,int in_port)
+{
+    //dbg("Called");
+    FonClient* client = __fon_client_malloc0_try();
 
-    if(__fon_lib.initiated) {
-        return TRUE;
+    __init_client(client, in_type, in_port);
+
+    if(!__connect_client(client)) {
+        goto ERROR;
     }
 
-    if(!__init_obj(&__fon_lib, context, in_type, in_port)) {
-        return FALSE;
-    }
+    goto RETURN;
 
-    if(!__attach_async_msg_handler_source()){
-        return FALSE;
-    }
-
-    return TRUE;
+ERROR:
+    //dbg("Error");
+    free(client);
+    client = NULL;
+RETURN:
+    //dbg("Done");
+    return client;
 }
 
-gboolean fon_sendto(packet *pkt) {
-
-    if(pkt->hdr.pkt_type != __fon_lib.fucn_type) {
-        return FALSE;
+bool
+fon_sendto(FonClient *client, packet_hdr_t *hdr)
+{
+    //dbg("Called");
+    if(hdr->type != client->func_type) {
+        printf("Failed\n");
+        return false;
     }
 
-    msg_rsp             rsp;
-    msg_req             req;
+    msg_req_buff_t              req;
+    msg_rsp_sendto_t            rsp;
+    int                         pkt_tot_len = sizeof(packet_hdr_t) + hdr->paylen;
 
-    req.hdr.func_type   = __fon_lib.fucn_type;
+    req.hdr.func_type   = client->func_type;
     req.hdr.msg_type    = MSG_TYPE_SENDTO;
-    req.hdr.tot_len     = sizeof(msg_req_sendto);
-    req.sendto.pkt      = *pkt;
+    req.hdr.tot_len     = sizeof(msg_req_sendto_t) + pkt_tot_len;
 
-    msg_send_req(__fon_lib.sync_sock, &req);
-    msg_recv_rsp(__fon_lib.sync_sock, &rsp);
+    // Assume that packet_buff_t's size is enough.
+    pkt_cpy(&req.sendto.pkt,
+            sizeof(msg_req_buff_t) - sizeof(msg_req_hdr_t),
+            hdr);
 
-    return rsp.hdr.result;
+    msg_req_send(client->sync_sock, &req.hdr);
+    msg_rsp_recv(client->sync_sock, &rsp.hdr, sizeof(msg_rsp_sendto_t));
+
+    //dbg("Done");
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-gboolean fon_table_add(table_tuple *tuple) {
-    msg_rsp             rsp;
-    msg_req             req;
+int
+fon_recvfrom(FonClient      *client,
+             packet_hdr_t   *hdr,
+             int            buflen)
+{
+    //dbg("Called");
+    int                 recvbyte;
 
-    req.hdr.func_type   = __fon_lib.fucn_type;
+    recvbyte = recvfrom(client->async_sock,
+                        hdr,
+                        // see fon_core.c:delivery_to_client()
+                        sizeof(packet_buff_t),
+                        MSG_WAITALL,
+                        0,
+                        0);
+
+    assert(hdr->type == client->func_type);
+
+    //dbg("Done");
+    return recvbyte;
+}
+
+
+bool
+fon_table_add(FonClient *client, fib_tuple_t   *tuple) {
+    msg_rsp_buff_t  rsp;
+    msg_req_buff_t  req;
+
+    req.hdr.func_type   = client->func_type;
     req.hdr.msg_type    = MSG_TYPE_TABLE_ADD;
-    req.hdr.tot_len     = sizeof(msg_req_table_add);
+    req.hdr.tot_len     = sizeof(msg_req_table_add_t);
     req.table_add.tuple = *tuple;
 
-    msg_send_req(__fon_lib.sync_sock, &req);
-    msg_recv_rsp(__fon_lib.sync_sock, &rsp);
+    msg_req_send(client->sync_sock, &req.hdr);
+    msg_rsp_recv(client->sync_sock, &rsp.hdr, sizeof(msg_rsp_buff_t));
 
-    return rsp.hdr.result;
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-gboolean fon_table_del(int id) {
-    msg_rsp             rsp;
-    msg_req             req;
+bool
+fon_table_del(FonClient *client, fon_id_t id) {
+    msg_rsp_buff_t      rsp;
+    msg_req_buff_t      req;
 
-    req.hdr.func_type   = __fon_lib.fucn_type;
+    req.hdr.func_type   = client->func_type;
     req.hdr.msg_type    = MSG_TYPE_TABLE_DEL;
-    req.hdr.tot_len     = sizeof(msg_req_table_del);
+    req.hdr.tot_len     = sizeof(msg_req_table_del_t);
     req.table_del.id    = id;
 
-    msg_send_req(__fon_lib.sync_sock, &req);
-    msg_recv_rsp(__fon_lib.sync_sock, &rsp);
+    msg_req_send(client->sync_sock, &req.hdr);
+    msg_rsp_recv(client->sync_sock, &rsp.hdr, sizeof(msg_rsp_buff_t));
 
-    return rsp.hdr.result;
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-gboolean fon_table_get(GArray **tuple_array)
+bool
+fon_table_get(FonClient *client, Array **tuple_array)
 {
-    msg_rsp         rsp;
-    msg_req         req;
-    GArray     *arr;
+    msg_req_buff_t  req     = {{0,}};
+    msg_rsp_buff_t  rsp     = {{0,}};
+    // number of tuples
+    int             len     = -1;
+    // Array of tuples
+    Array           *arr    = NULL;
 
-    req.hdr.func_type   = __fon_lib.fucn_type;
+    req.hdr.func_type   = client->func_type;
     req.hdr.msg_type    = MSG_TYPE_TABLE_GET;
-    req.hdr.tot_len     = sizeof(msg_req_table_get);
+    req.hdr.tot_len     = sizeof(msg_req_table_get_t);
 
-    msg_send_req(__fon_lib.sync_sock, &req);
-    msg_recv_rsp(__fon_lib.sync_sock, &rsp);
+    msg_req_send(client->sync_sock, &req.hdr);
+    msg_rsp_recv(client->sync_sock, &rsp.hdr, sizeof(msg_rsp_buff_t));
 
-    if(rsp.hdr.result) {
-        arr = TUPLE_GARRAY_NEW();
-        g_array_append_vals(arr, rsp.table_get.tuple, MSG_RSP_GET_TUPLE_LEN(&rsp));
+    len = MSG_RSP_GET_TUPLE_LEN(&rsp);
+
+    if(MSG_RESULT_BOOL(rsp.hdr.result)) {
+        arr = array_new(len, sizeof(fib_tuple_t  ), true);
+        array_append_vals(arr, rsp.table_get.tuple, len);
         *tuple_array = arr;
     }
 
-    return rsp.hdr.result;
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-gboolean fon_host_get(int *out_id)
+bool
+fon_host_get(FonClient *client, fon_id_t *out_id)
 {
-    msg_rsp         rsp;
-    msg_req         req;
+    msg_rsp_buff_t  rsp = {{0,}};
+    msg_req_buff_t  req = {{0,}};
 
-    req.hdr.func_type   = __fon_lib.fucn_type;
+    req.hdr.func_type   = client->func_type;
     req.hdr.msg_type    = MSG_TYPE_HOST_GET;
-    req.hdr.tot_len     = sizeof(msg_req_host_get);
+    req.hdr.tot_len     = sizeof(msg_req_host_get_t);
 
-    msg_send_req(__fon_lib.sync_sock, &req);
-    msg_recv_rsp(__fon_lib.sync_sock, &rsp);
+    msg_req_send(client->sync_sock,
+                 &req.hdr);
 
-    if(rsp.hdr.result) {
+    msg_rsp_recv(client->sync_sock,
+                 &rsp.hdr,
+                 sizeof(msg_rsp_buff_t));
+
+    if(MSG_RESULT_BOOL(rsp.hdr.result)) {
         *out_id = rsp.host_get.host_id;
     }
 
-    return rsp.hdr.result;
+    return MSG_RESULT_BOOL(rsp.hdr.result);
 }
 
-int fon_get_type()
+fon_type_t
+fon_get_type(FonClient *client)
 {
-    return __fon_lib.fucn_type;
+    return client->func_type;
 }
-
-void fon_set_callback_recv(FonCallbackRecv callback_recv, gpointer user_data)
-{
-    __fon_lib.callbacks.callback_recv = callback_recv;
-    __fon_lib.args.recv_arg = user_data;
-
-    return;
-}
-
 
