@@ -11,6 +11,7 @@
 #include "aco-table.h"
 #include "ant-model.h"
 #include "acod.h"
+
 #include "ant.h"
 
 #define  CHECK_POINT	(printf("Check point:: %s(%s:%d)\n", __FUNCTION__, __FILE__, __LINE__))
@@ -674,7 +675,7 @@ ow_send(RealAnt* ant)
 // Called by virtual function, ant->op.callback()
 static void    ow_callback (RealAnt* ant)
 {
-    _source_update(ant->table, ant->obj, ant_normalizing_model);
+    _source_update(ant->table, ant->obj, ANT_MODEL_SELECTOR);
 }
 
 /*==============================================================================

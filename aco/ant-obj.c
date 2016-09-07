@@ -5,8 +5,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include "ant-obj.h"
 #include "ant-def.h"
+
+#include "ant-obj.h"
 
 
 /*==============================================================================

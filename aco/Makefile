@@ -20,24 +20,28 @@ CFLAGS      += $(WARNINGS)
 LDFLAGS     += $(LIBS)
 
 SRCS        += aco-table.c
-SRCS        += ant-model.c ant-obj.c ant.c client.c
+SRCS        += ant-model.c ant-obj.c ant.c aco_ipc.c
 SRCS        += acod.c
 SRCS        += main.c
 OBJS        = $(SRCS:.c=.o)
 ACOD        = acod
+FIND        = find
 TEST_OBJ    = test-obj
 TEST_TABLE  = test-table
 TEST_ANT    = test-ant
 UNIT_TESTS  = $(TEST_OBJ) $(TEST_TABLE) $(TEST_ANT) $(TEST_DAEMON)
 
 # Executables
-TARGETS     = $(ACOD)
+TARGETS     = $(ACOD) $(FIND)
 
 .PHONY: all clean
 
 all: $(TARGETS)
 
 $(ACOD): $(OBJS) $(ACOD).o
+	$(CC) $^ -o $@ $(LDFLAGS)
+
+$(FIND): $(FIND).o client.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 # Unit test code
@@ -57,7 +61,7 @@ $(TEST_DAEMON): $(OBJS) $(TEST_DAEMON).o
 	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(TARGETS) $(OBJS) $(DEPENDENCY)
+	$(RM) $(TARGETS) *.o $(DEPENDENCY)
 
 tag:
 	ctags -n -R

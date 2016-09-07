@@ -1,5 +1,5 @@
-#include "ant-model.h"
 #include "ant-def.h"
+#include "ant-model.h"
 
 void ant_normalizing_model(aco_ph_t* ph, aco_dist_t global_min, aco_dist_t local_min, aco_dist_t dist)
 {

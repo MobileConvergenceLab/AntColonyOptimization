@@ -59,4 +59,12 @@ typedef uint16_t                    aco_len_packed_t;
 #define ACO_LEN_PACK(X)             (htons(X))
 #define ACO_LEN_UNPACK(X)           (ntohs(X))
 
+typedef int                         aco_cycle_t;
+typedef uint16_t                    aco_cycle_packed_t;
+#define ACO_CYCLE_LEN               (sizeof(aco_cycle_packed_t)*8)
+#define ACO_CYCLE_WRONG             (-1)
+#define ACO_CYCLE_MAX               ((1 << ACO_CYCLE_LEN) - 1)
+#define ACO_CYCLE_PACK(X)           (htons(X))
+#define ACO_CYCLE_UNPACK(X)         (ntohs(X))
+
 #endif // ACO_TYPES_H

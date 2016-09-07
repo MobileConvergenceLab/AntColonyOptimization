@@ -2,6 +2,8 @@
 #include <fon/fon_fib_if.h>
 #include "aco-table.h"
 #include "ant.h"
+#include "aco_ipc.h"
+
 #include "acod.h"
 
 #define CHECK_POINT	(printf("Check point:: %s(%s:%d)\n", __FUNCTION__, __FILE__, __LINE__))
@@ -196,8 +198,11 @@ static gboolean _add_read_source(GMainContext *context,
 				user_data,
 				notify);
 	src_id = g_source_attach(source, context);
-	g_assert(src_id > 0);
 	g_source_unref(source);
+	if(src_id == 0)
+	{
+		return FALSE;
+	}
 
 	return TRUE;
 } // attach_read_source()
@@ -360,17 +365,88 @@ static void _aco_daemon_dead_handler_attach(AcoDaemon* daemon)
 	// this fd is connection-oriented socket.
 	// So, if disconnection occur,
 	// we will find out that "Daemon is dead" through this fd.
-
-	int fd			= daemon->fclient->sync_sock;
-
 	_add_read_source(daemon->context,
-			fd,
+			daemon->fclient->sync_sock,
 			(GSourceFunc)_fon_dead_handler,
 			NULL,
 			NULL);
 }
 
-static int _ipc_sock(int ipc_port)
+// compatible with GSourceFunc
+static gboolean _client_handler(gint fd,
+			GIOCondition condition,
+			AcoDaemon* daemon)
+{
+	if(condition != G_IO_IN)
+	{
+		// condition may be G_IO_HUP
+		// or G_IO_ERR
+		// or G_IO_NVAL.
+		// Those means that connection has been broken.
+		goto DISCONNECTED;
+	}
+
+	uint8_t buff[1024];
+	int buflen = 1024;
+	uint8_t unpack[1024];
+	struct request_hdr *hdr = (struct request_hdr *)unpack;
+
+	if(recv(fd, buff, buflen, 0) <= 0)
+	{
+		// 0 mean normally shut-down.
+		// -1 mean error occured.
+		// both of them means that connection has been broken.
+		goto DISCONNECTED;
+	}
+
+	request_deserial(buff, buflen, hdr);
+
+	switch(hdr->type)
+	{
+	case message_type_find:
+		{
+			struct find_reqeust *fr = (struct find_reqeust *)hdr;
+			aco_id_t target = ACO_ID_UNPACK(fr->target);
+			aco_cycle_t ncycle = ACO_CYCLE_UNPACK(fr->ncycle);
+
+			printf("type(%d) paylen(%d) target(%d) ncycle(%d)\n",
+				hdr->type,
+				hdr->paylen,
+				target,
+				ncycle);
+
+			int npacket_per_cycle	= 10;
+			// the timeout interval in milliseconds
+			guint interval		= 2000;
+
+			if(!aco_table_is_neigh(daemon->table, target) &&
+			!aco_table_is_target(daemon->table, target))
+			{
+				aco_table_add_target(daemon->table, target);
+			}
+
+			aco_daemon_request_attach(daemon,
+						target,
+						ncycle,
+						npacket_per_cycle,
+						interval);
+		}
+		break;
+	default:
+		// do nothing
+		break;
+	}
+
+	return true;
+
+DISCONNECTED:
+	fprintf(stderr, "Disconnected\n");
+	close(daemon->ipc_client_fd);
+	daemon->ipc_client_fd = -1;
+	return false;
+}
+
+static int _ipc_listen_sock(int ipc_port)
 {
 	int			listen_sock = -1;
 	struct sockaddr_in	addr = {};
@@ -425,31 +501,51 @@ static gboolean _ipc_accept(gint fd,
 						// We don't need client's sock address
 						NULL,
 						0);
+
+
 		if(daemon->ipc_client_fd == -1)
 		{
 			perror("accept()");
 			exit(EXIT_FAILURE);
 		}
+		else
+		{
+			fprintf(stderr, "Connection has been established\n");
+			_add_read_source(daemon->context,
+					daemon->ipc_client_fd,
+					(GSourceFunc)_client_handler,
+					daemon,
+					NULL);
+		}
 	}
 	else
 	{
-		// ignore request
+		// ignore the request
 	}
 
 	return true;
 }
 
-
-/*==============================================================================
- *
- *==============================================================================*/
-AcoDaemon* aco_daemon_create(aco_parameters *para)
+// 
+static void _aco_daemon_accept_attach(AcoDaemon* daemon)
 {
-	AcoDaemon *daemon = malloc(sizeof(AcoDaemon));
+	daemon->ipc_listen_fd = _ipc_listen_sock(daemon->para.ipc_listen_port);
+	if(daemon->ipc_listen_fd == -1)
+	{
+		perror("_ipc_listen_sock()");
+		exit(EXIT_FAILURE);
+	}
 
-	//
-	daemon->para = *para;
+	_add_read_source(daemon->context,
+			daemon->ipc_listen_fd,
+			(GSourceFunc)_ipc_accept,
+			daemon,
+			// notify
+			NULL);
+}
 
+void _aco_daemon_init_context(AcoDaemon* daemon)
+{
 	// init GMainContext && GMainLoop
 	daemon->context = g_main_context_new();
 	if(daemon->context == NULL)
@@ -463,29 +559,58 @@ AcoDaemon* aco_daemon_create(aco_parameters *para)
 		exit(EXIT_FAILURE);
 	}
 	g_main_context_unref(daemon->context);
-	
-	daemon->fclient = fon_client_new(FON_FUNC_TYPE_ACO, para->fon_client_port);
+}
+
+void _aco_daemon_init_fclient(AcoDaemon* daemon)
+{
+	daemon->fclient = fon_client_new(FON_FUNC_TYPE_ACO, daemon->para.fon_client_port);
 	if(daemon->fclient == NULL)
 	{
 		perror("Call fon_init()");
 		exit(EXIT_FAILURE);
 	}
+}
 
-	// Init Table
+void _aco_daemon_init_table(AcoDaemon* daemon)
+{
 	daemon->table = _table_create(daemon->fclient,
-				para->min,
-				para->max,
-				para->endurance_max);
+				daemon->para.min,
+				daemon->para.max,
+				daemon->para.endurance_max);
 	if(daemon->table == NULL)
 	{
 		perror("Call _table_create()");
 		exit(EXIT_FAILURE);
 	}
+}
 
+void _aco_daemon_init(AcoDaemon* daemon, aco_parameters *para)
+{
+	daemon->context		= NULL;
+	daemon->loop		= NULL;
+	daemon->fclient		= NULL;
+	daemon->table		= NULL;
+	daemon->para		= *para;
+	daemon->ipc_listen_fd	= -1;
+	daemon->ipc_client_fd	= -1;
+}
+
+/*==============================================================================
+ *
+ *==============================================================================*/
+AcoDaemon* aco_daemon_create(aco_parameters *para)
+{
+	AcoDaemon *daemon = malloc(sizeof(AcoDaemon));
+	_aco_daemon_init(daemon, para);
+
+	_aco_daemon_init_context(daemon);
+	_aco_daemon_init_fclient(daemon);
+	_aco_daemon_init_table(daemon);
+
+	// Init listen port
+	_aco_daemon_accept_attach(daemon);
 	_aco_daemon_recv_attach(daemon);
-
 	_aco_daemon_dead_handler_attach(daemon);
-
 	_aco_daemon_fib_update_attach(daemon,
 				// milisecond
 				5000);

@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 #include <string.h>
-#include "client.h"
+#include "aco_ipc.h"
 
 struct packed_request_hdr {
 	uint32_t type;
@@ -24,7 +24,7 @@ void request_serial(uint8_t *buff, size_t *size, struct request_hdr *hdr)
 	memcpy(packed_hdr->data, hdr->data, hdr->paylen);
 }
 
-void request_deserial(uint8_t *buff, size_t size, struct response_hdr *hdr)
+void request_deserial(uint8_t *buff, size_t size, struct request_hdr *hdr)
 {
 	struct packed_request_hdr *packed_hdr = (struct packed_request_hdr*)buff;
 
@@ -33,10 +33,3 @@ void request_deserial(uint8_t *buff, size_t size, struct response_hdr *hdr)
 	memcpy(hdr->data, packed_hdr->data, hdr->paylen);
 }
 
-void response_serial(uint8_t *buff, size_t *size, struct response_hdr *hdr)
-{
-}
-
-void response_deserial(uint8_t *buff, size_t size, struct response_hdr *hdr)
-{
-}

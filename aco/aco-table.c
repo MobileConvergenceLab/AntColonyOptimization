@@ -1,12 +1,11 @@
-#include "aco-table.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
-
 #include <fon/fon_defs.h>
 #include "aco-policies.h"
+
+#include "aco-table.h"
 
 #define _WRONG_IDX (-1)
 

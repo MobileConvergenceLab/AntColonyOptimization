@@ -24,8 +24,8 @@ struct response_hdr {
 
 struct find_reqeust {
 	struct request_hdr hdr;
-	aco_id_t target;
-	uint32_t ncycle;
+	aco_id_packed_t target;
+	aco_cycle_packed_t ncycle;
 };
 
 struct find_response {
@@ -33,7 +33,9 @@ struct find_response {
 };
 
 void request_serial(uint8_t *buff, size_t *size, struct request_hdr *hdr);
-void request_deserial(uint8_t *buff, size_t size, struct response_hdr *hdr);
+void request_deserial(uint8_t *buff, size_t size, struct request_hdr *hdr);
+
+// not implemented
 void response_serial(uint8_t *buff, size_t *size, struct response_hdr *hdr);
 void response_deserial(uint8_t *buff, size_t size, struct response_hdr *hdr);
 
