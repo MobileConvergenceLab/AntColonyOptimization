@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <limits.h>
+#include <stdint.h>
 
 #define     FON_FUNC_TYPE_ACO       (0x8033)
 

@@ -1,6 +1,3 @@
-/**
- * client-daemon 간 IPC 테스트를 위해 작성한 코드.
- */
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

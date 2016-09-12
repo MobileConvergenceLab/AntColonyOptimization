@@ -32,8 +32,8 @@ struct find_response {
 	struct response_hdr hdr;
 };
 
-void request_serial(uint8_t *buff, size_t *size, struct request_hdr *hdr);
-void request_deserial(uint8_t *buff, size_t size, struct request_hdr *hdr);
+void request_serial(void *buff, size_t *size, struct request_hdr *hdr);
+void request_deserial(void *buff, size_t size, struct request_hdr *hdr);
 
 // not implemented
 void response_serial(uint8_t *buff, size_t *size, struct response_hdr *hdr);

@@ -15,7 +15,7 @@ struct packed_response_hdr {
 	uint8_t data[];
 };
 
-void request_serial(uint8_t *buff, size_t *size, struct request_hdr *hdr)
+void request_serial(void *buff, size_t *size, struct request_hdr *hdr)
 {
 	struct packed_request_hdr *packed_hdr = (struct packed_request_hdr*)buff;
 
@@ -24,7 +24,7 @@ void request_serial(uint8_t *buff, size_t *size, struct request_hdr *hdr)
 	memcpy(packed_hdr->data, hdr->data, hdr->paylen);
 }
 
-void request_deserial(uint8_t *buff, size_t size, struct request_hdr *hdr)
+void request_deserial(void *buff, size_t size, struct request_hdr *hdr)
 {
 	struct packed_request_hdr *packed_hdr = (struct packed_request_hdr*)buff;
 

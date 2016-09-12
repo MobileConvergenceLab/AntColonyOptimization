@@ -4,7 +4,7 @@
 #include <stdio.h> // perror()
 #include <unistd.h> // close()
 
-#include "client.h"
+#include "aco_ipc.h"
 
 int main(int argc, char **argv)
 {

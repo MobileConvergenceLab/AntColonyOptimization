@@ -8,6 +8,7 @@ LIBS        += `pkg-config --libs glib-2.0`
 WARNINGS    += -W -Wall -Wshadow
 WARNINGS    += -Werror
 WARNINGS    += -Wno-unused-parameter
+WARNINGS    += -Wno-unused-function
 WARNINGS    += -Wno-missing-field-initializers
 
 CXXFLAGS    += -c

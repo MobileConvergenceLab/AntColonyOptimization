@@ -86,15 +86,19 @@ _add_initial_flow	(const br_name_t&bridge,
 	command << OVS_OF_ADD_FLOW << " priority=1,dl_dst=" << EtherLink::get_address(internal) <<",action=normal";
 	_system_redirect_to_nulldev(command.str());
 
-
 	command = std::stringstream("");
 	command << OVS_OF_ADD_FLOW << " priority=1,dl_dst=ff:ff:ff:ff:ff:ff,action=output:" << port;
 	_system_redirect_to_nulldev(command.str());
 
+
 	// For ICMP pacekt
-	command = std::stringstream("");
-	command << OVS_OF_ADD_FLOW << " priority=2000,ip,nw_ttl=1,icmp,action=dec_ttl,normal:" << port;
-	system(command.str().c_str());
+
+	// XXX 2016.9.9
+	// 이 부분을 활성화 하면
+	// ONOS의 Web GUI 쪽이 정상작동하지 않는다. 왜?
+//	command = std::stringstream("");
+//	command << OVS_OF_ADD_FLOW << " priority=2000,ip,nw_ttl=1,icmp,action=dec_ttl,normal:" << port;
+//	system(command.str().c_str());
 }
 
 

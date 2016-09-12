@@ -22,7 +22,6 @@ LDFLAGS     += $(LIBS)
 SRCS        += aco-table.c
 SRCS        += ant-model.c ant-obj.c ant.c aco_ipc.c
 SRCS        += acod.c
-SRCS        += main.c
 OBJS        = $(SRCS:.c=.o)
 ACOD        = acod
 FIND        = find
@@ -38,10 +37,10 @@ TARGETS     = $(ACOD) $(FIND)
 
 all: $(TARGETS)
 
-$(ACOD): $(OBJS) $(ACOD).o
+$(ACOD): $(OBJS) main.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-$(FIND): $(FIND).o client.o
+$(FIND): $(OBJS) find.o 
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 # Unit test code
