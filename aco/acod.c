@@ -235,10 +235,6 @@ static gboolean _fon_recv_callack(gint fd,
 	ant_object_arrived_at(ant->obj,
 			arg->table->host);
 
-	// DEBUG
-	CHECK_POINT;
-	aco_table_print_all(arg->table);
-
 	ant_callback(ant);
 	ant_unref(ant);
 
@@ -544,7 +540,7 @@ static void _aco_daemon_accept_attach(AcoDaemon* daemon)
 			NULL);
 }
 
-void _aco_daemon_init_context(AcoDaemon* daemon)
+static void _aco_daemon_init_context(AcoDaemon* daemon)
 {
 	// init GMainContext && GMainLoop
 	daemon->context = g_main_context_new();
@@ -561,7 +557,7 @@ void _aco_daemon_init_context(AcoDaemon* daemon)
 	g_main_context_unref(daemon->context);
 }
 
-void _aco_daemon_init_fclient(AcoDaemon* daemon)
+static void _aco_daemon_init_fclient(AcoDaemon* daemon)
 {
 	daemon->fclient = fon_client_new(FON_FUNC_TYPE_ACO, daemon->para.fon_client_port);
 	if(daemon->fclient == NULL)
@@ -571,7 +567,18 @@ void _aco_daemon_init_fclient(AcoDaemon* daemon)
 	}
 }
 
-void _aco_daemon_init_table(AcoDaemon* daemon)
+#if POLICY_EVAPORATE_ENABLE
+// compatible with GSourceFunc
+static gboolean _evaporate_update_handler(AcoDaemon* daemon)
+{
+	aco_table_evaporate_all(daemon->table,
+				ANT_REMAIN_RATE);
+
+	return true;
+}
+#endif
+
+static void _aco_daemon_init_table(AcoDaemon* daemon)
 {
 	daemon->table = _table_create(daemon->fclient,
 				daemon->para.min,
@@ -582,9 +589,22 @@ void _aco_daemon_init_table(AcoDaemon* daemon)
 		perror("Call _table_create()");
 		exit(EXIT_FAILURE);
 	}
+
+	#if POLICY_EVAPORATE_ENABLE
+       // 주기적으로 모든 페로몬 증발
+	if(!_add_timeout_source(daemon->context,
+				(GSourceFunc)_evaporate_update_handler,
+				CYCLE_INTERVAL,
+				daemon,
+				NULL))
+	{
+		perror("Call forward_timeout_add()");
+		exit(EXIT_FAILURE);
+	}
+	#endif
 }
 
-void _aco_daemon_init(AcoDaemon* daemon, aco_parameters *para)
+static void _aco_daemon_init(AcoDaemon* daemon, aco_parameters *para)
 {
 	daemon->context		= NULL;
 	daemon->loop		= NULL;
@@ -593,6 +613,20 @@ void _aco_daemon_init(AcoDaemon* daemon, aco_parameters *para)
 	daemon->para		= *para;
 	daemon->ipc_listen_fd	= -1;
 	daemon->ipc_client_fd	= -1;
+}
+
+static void _aco_daemon_add_event_print_table(AcoDaemon* daemon, guint microsecond)
+{
+	if(!_add_timeout_source(daemon->context,
+				(GSourceFunc)aco_table_print_all,
+				microsecond,
+				//CYCLE_INTERVAL,
+				daemon->table,
+				NULL))
+	{
+		perror("Call forward_timeout_add()");
+		exit(EXIT_FAILURE);
+	}
 }
 
 /*==============================================================================
@@ -614,6 +648,9 @@ AcoDaemon* aco_daemon_create(aco_parameters *para)
 	_aco_daemon_fib_update_attach(daemon,
 				// milisecond
 				5000);
+
+	// 주기적으로 테이블 출력
+	_aco_daemon_add_event_print_table(daemon, 3000);
 
 	return daemon;
 }

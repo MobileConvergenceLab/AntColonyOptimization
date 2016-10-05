@@ -200,6 +200,9 @@ OvsIf::~OvsIf()
 
 bool OvsIf::add_flow_neighbor(fon_id_t neighbor)
 {
+	assert(0);
+	exit(EXIT_FAILURE);
+
 	/* 수정할게 많음 이유:
 	 * 본 함수는 인접한 노드가 발견되었을 때 콜백함수로 호출된다.
 	 * 하지만 본 데몬은 ovs-db가 갱신되기 전에 본 함수가 호출되기 때문에
@@ -250,10 +253,6 @@ bool OvsIf::add_flow_target(fon_id_t target, fon_id_t neighbor)
 	if(iter == m_flows.end() ||
 	   iter->second != flow)
 	{
-		/* TODO:
-		 * _add_flow()가 단순히 ip 주소에 대한 플로우만 추가한다.
-		 * MAC NAT도 수행해야 하는데...
-		 * 수정완료하면 arp 테이블 추가 부분도 브로드캐스팅이 아니게 수정해줘야 한다. */
 		// OVS상에 flow 추가
 		_add_flow(flow);
 
@@ -261,6 +260,8 @@ bool OvsIf::add_flow_target(fon_id_t target, fon_id_t neighbor)
 		m_flows[target] = flow;
 
 		// ARP 테이블 추가
+		// flow에 mac주소 변경하는 부분이 있기 때문에
+		// 사실 dummy값을 넣어도 상관은 없다.
 		_add_arp(ip_addr, mac_addr);
 	}
 	else

@@ -112,7 +112,6 @@ void            aco_table_register_callee   (AcoTable       *table,
                                             evapor_cbfunc_t evapor_cbfunc,
                                             evapor_cbarg_t  evapor_cbarg,
                                             evapor_dtor_t   evapor_dtor);
-                                             
 
 #ifdef __cpluscplus
 } // extern "C"

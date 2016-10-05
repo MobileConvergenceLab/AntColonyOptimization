@@ -214,11 +214,12 @@ ant_callback(Ant* fant)
         _backtrack_update(ant->table, ant->obj);
         #endif
 
-        // 출발점으로 백트래킹 했을 경우에는 패킷을 버린다.
+        #if ANT_SOURCE_AGAIN_THEN_DROP
         if(ant->obj->source == ant->table->host)
         {
             goto RETURN;
         }
+        #endif
     }
     else
     {
@@ -238,7 +239,9 @@ ant_callback(Ant* fant)
     ant->op.callback(ant);
     ant_send(fant);
 
+#if ANT_SOURCE_AGAIN_THEN_DROP
 RETURN:
+#endif
     return;
 }
 
