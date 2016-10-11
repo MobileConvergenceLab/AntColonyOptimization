@@ -1,0 +1,146 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*- 
+import sys
+import os
+import time
+import threading
+import subprocess
+import argparse
+import random
+
+from mininet.net import Mininet
+from mininet.topo import Topo
+from mininet.topolib import TreeTopo
+from mininet.util import dumpNodeConnections
+from mininet.cli import CLI
+from mininet.node import RemoteController
+
+class MyTopo(Topo):
+	def __init__(self, topofilename):
+		# Initialize topology
+		Topo.__init__(self)
+
+		self.readfile(topofilename)
+
+	def readfile(self, topofilename):
+		switches = []
+		hosts = []
+
+		with open(topofilename, 'r') as topofile:
+			line = topofile.readline() 
+			nline = int(line)
+
+			# Add hosts and switches
+			for i in range(int(nline)):
+				hostname = 'h' + str(i)
+				hosts.append(self.addHost(hostname))
+
+				switchname = 's' + str(i)
+				switches.append(self.addSwitch(switchname))
+
+				self.addLink(hosts[i], switches[i])
+
+			# Add links
+			for i in range(int(nline)):
+				string = topofile.readline()
+
+				# Read lower triangle matrix
+				for j in range(int(i)):
+					if(string[j] == '1'):
+						self.addLink(switches[i], switches[j])
+					else:
+						pass
+
+
+'''
+HOSTID	   FON host ID.
+INTERNAL   Internal interface which will be conneted to OVS-Bridge.
+BRNAME	 The name of OVS-Bridge which will be made.
+MININET	Mininet mode flag
+PORT	   IPC listen port number
+IFLIST	 Physical interface names
+'''
+def run_fond(host, hostid, internal, bridge, mininet, port, iflist, hidden=True):
+	# 환경변수가 왜 상속이 안되지?
+	cmdstr = '../fond/fond %d %s %s %d %d %s' %(hostid, internal, bridge, mininet, port, iflist)
+
+	if(hidden == True):
+		cmdstr = cmdstr + ' > /dev/null 2>&1 &' 
+	else:
+		cmdstr = 'xterm -e ' + cmdstr + ' &'
+	
+	# sendCmd()로 대체 가능할지도?
+	host.cmd(cmdstr)
+
+def all_run_fond(net):
+	i=0
+	for host in net.hosts:
+		hostid = i
+		internal = 'h%d-eth0' % (i)
+		bridge = 's%d' % (i)
+		mininet = 1
+		port = 9900 + i
+		iflist = internal
+
+		if(i==0):
+			run_fond(host, hostid, internal, bridge, mininet, port, iflist, False)
+		else:
+			run_fond(host, hostid, internal, bridge, mininet, port, iflist)
+		i = i+1
+
+def run_acod(host, fon_port, aco_port, hidden=True):
+	cmdstr = '../aco/acod %d %d' %(fon_port, aco_port)
+
+	if(hidden == True):
+		cmdstr = cmdstr + ' > /dev/null 2>&1 &'
+	else:
+		cmdstr = 'xterm -e ' + cmdstr + ' &'
+	
+	host.cmd(cmdstr)
+
+def all_run_acod(net):
+	i=0
+	for host in net.hosts:
+		port = 9900 + i
+
+		if(i==0):
+			run_acod(host, port, port+10000, False)
+		else:
+			run_acod(host, port, port+10000, True)
+		i = i+1
+
+def return_args():
+	parser = argparse.ArgumentParser()
+
+	parser.add_argument('topofile', metavar='topofile', type=str,
+						help='The filename that describes topology')
+
+	return parser.parse_args()
+
+def main():
+	args = return_args()
+
+	my_topo = MyTopo(args.topofile)
+
+#	ONOS_IP = '127.0.0.1'
+#	ONOS_PORT = 6633
+#	controller = RemoteController('c0', ip=ONOS_IP, port=ONOS_PORT)
+	controller = None
+
+	net = Mininet(topo=my_topo, controller=controller, cleanup=True)
+	print 'total hosts: %d' % len(net.hosts)
+	print 'total switches: %d' % len(net.switches)
+	net.start()
+
+	all_run_fond(net)
+	time.sleep(8)
+	all_run_acod(net)
+
+	CLI(net)
+
+	net.stop()
+
+if __name__ == '__main__':
+	main()
+
+
