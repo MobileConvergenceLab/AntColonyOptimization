@@ -12,7 +12,7 @@
 
 class OvsIf {
 public:
-	OvsIf(IdTablePtr idtable, if_name_t internal, br_name_t bridge, if_list_t if_list, bool mininet);
+	OvsIf(IdTablePtr idtable, if_name_t internal, br_name_t bridge, if_list_t if_list, bool br_create);
 	~OvsIf();
 	bool add_flow_neighbor(fon_id_t neighbor);
 	bool add_flow_target(fon_id_t target, fon_id_t neighbor);
@@ -28,8 +28,8 @@ private:
 	// physical interface names
 	if_list_t m_if_list;
 
-	// mininet emulation mode
-	const bool m_mininet;
+	// for mininet emulation mode
+	const bool m_br_create;
 
 	OvsFdb m_db;
 

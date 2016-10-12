@@ -13,95 +13,108 @@ from mininet.topo import Topo
 from mininet.topolib import TreeTopo
 from mininet.util import dumpNodeConnections
 from mininet.cli import CLI
+from mininet.node import RemoteController
 
-SNDER_ID	= 1
-RCVER_ID	= 2
-SNDER_PORT  = 9901
-RCVER_PORT  = 9902
-
-class FonHost():
-	def __init__(self):
-		self.host = None
-		self.switch = None
-	
-
-class FonTopo(Topo):
-	def __init__(self):
+class MyTopo(Topo):
+	def __init__(self, topofilename):
 		# Initialize topology
 		Topo.__init__(self)
 
-	def addHost(self, hostname, switchname):
-		fonhost = FonHost()
-		fonhost.host = Topo.addHost(self, hostname)
-		fonhost.switch = Topo.addSwitch(self, switchname)
-		Topo.addLink(self, fonhost.host, fonhost.switch)
-		return fonhost
+		self.readfile(topofilename)
 
-	def addLink(self, host1, host2):
-		Topo.addLink(self, host1.switch, host2.switch)
+	def readfile(self, topofilename):
+		switches = []
+		hosts = []
 
-class MyTopo(FonTopo):
-	def __init__(self):
-		# Initialize topology
-		FonTopo.__init__(self)
+		with open(topofilename, 'r') as topofile:
+			line = topofile.readline() 
+			nline = int(line)
 
-		self.h1 = self.addHost('h1', 's1')
-		self.h2 = self.addHost('h2', 's2')
+			# Add hosts and switches
+			for i in range(int(nline)):
+				hostname = 'h' + str(i)
+				hosts.append(self.addHost(hostname))
 
-		self.addLink(self.h1, self.h2)
+				switchname = 's' + str(i)
+				switches.append(self.addSwitch(switchname))
+
+				self.addLink(hosts[i], switches[i])
+
+			# Add links
+			for i in range(int(nline)):
+				string = topofile.readline()
+
+				# Read lower triangle matrix
+				for j in range(int(i)):
+					if(string[j] == '1'):
+						self.addLink(switches[i], switches[j])
+					else:
+						pass
+
 
 '''
-HOST	   FON host ID.
+HOSTID	   FON host ID.
 INTERNAL   Internal interface which will be conneted to OVS-Bridge.
-BRNAME	 The name of OVS-Bridge which will be made.
-MININET	Mininet mode flag
+BRNAME	   The name of OVS-Bridge which will be made.
+BRCREATE   
 PORT	   IPC listen port number
-IFLIST	 Physical interface names
+IFLIST	   Physical interface names
 '''
-def run_fond(host, hostid, internal, bridge, mininet, port, iflist):
-	cmdstr = 'xterm -e ./fond %d %s %s %d %d %s > /dev/null 2>&1 &' %(hostid, internal, bridge, mininet, port, iflist)
-	print cmdstr
+def run_fond(host, hostid, internal, bridge, br_create, port, iflist, hidden=True):
+	# 환경변수가 왜 상속이 안되지?
+	cmdstr = './fond %s %s %s %d %d %s' %(hostid, internal, bridge, br_create, port, iflist)
+
+	if(hidden == True):
+		cmdstr = cmdstr + ' > /dev/null 2>&1 &' 
+	else:
+		cmdstr = 'xterm -e ' + cmdstr + ' &'
+	
 	# sendCmd()로 대체 가능할지도?
 	host.cmd(cmdstr)
 
-def run_sender(host, port, sender_id, receiver_id):
-	cmdstr = 'xterm -e ./sender "%d" "%d" "%d"&' % (port, sender_id, receiver_id)
-	print cmdstr
-	host.cmd(cmdstr)
+def all_run_fond(net):
+	i=0
+	for host in net.hosts:
+		hostid = "10.0.0.%d" % (i+1)
+		internal = 'h%d-eth0' % (i)
+		bridge = 's%d' % (i)
+		br_create = 1
+		port = 9900 + i
+		iflist = internal
 
-def run_receiver(host, port):
-	cmdstr = 'xterm -e ./receiver "%d" &' % (port)
-	print cmdstr
-	host.cmd(cmdstr)
+		if(i==0):
+			run_fond(host, hostid, internal, bridge, br_create, port, iflist, False)
+		else:
+			run_fond(host, hostid, internal, bridge, br_create, port, iflist)
+		i = i+1
+
+def return_args():
+	parser = argparse.ArgumentParser()
+
+	parser.add_argument('topofile', metavar='topofile', type=str,
+						help='The filename that describes topology')
+
+	return parser.parse_args()
 
 def main():
+	args = return_args()
 
-	if os.getuid() != 0:
-		print("I cannot run as a mortal. Sorry.")
-		sys.exit(1)
+	my_topo = MyTopo(args.topofile)
 
-	my_topo = MyTopo()
+#	ONOS_IP = '127.0.0.1'
+#	ONOS_PORT = 6633
+#	controller = RemoteController('c0', ip=ONOS_IP, port=ONOS_PORT)
+	controller = None
 
-	net = Mininet(topo=my_topo, controller = None)
+	net = Mininet(topo=my_topo, controller=controller, cleanup=True)
+	print 'total hosts: %d' % len(net.hosts)
+	print 'total switches: %d' % len(net.switches)
 	net.start()
 
-	'''
-	HOST	   FON host ID.
-	INTERNAL   Internal interface which will be conneted to OVS-Bridge.
-	BRNAME	 The name of OVS-Bridge which will be made.
-	MININET	Mininet mode flag
-	PORT	   IPC listen port number
-	IFLIST	 Physical interface names
-	'''
-	run_fond(net.hosts[0], SNDER_ID, "h1-eth0", "s1", 1, SNDER_PORT, "h1-eth0")
-	run_fond(net.hosts[1], RCVER_ID, "h2-eth0", "s2", 1, RCVER_PORT, "h2-eth0")
-
-	time.sleep(0.1)
-
-	run_sender(net.hosts[0], SNDER_PORT, SNDER_ID, RCVER_ID)
-	run_receiver(net.hosts[1], RCVER_PORT)
+	all_run_fond(net)
 
 	CLI(net)
+
 	net.stop()
 
 if __name__ == '__main__':

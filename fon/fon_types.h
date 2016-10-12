@@ -6,13 +6,12 @@
 #include <arpa/inet.h>
 
 // FON node identifier
-typedef int                 fon_id_t;
-typedef uint16_t            fon_id_packed_t;
+typedef in_addr_t           fon_id_t;
+typedef in_addr_t           fon_id_packed_t;
 #define FON_ID_LEN          (sizeof(fon_id_packed_t)*8)
-#define FON_ID_WRONG        (-1)
-#define FON_ID_MAX          ((1<<FON_ID_LEN)-1)
-#define FON_ID_PACK(X)      htons(X)
-#define FON_ID_UNPACK(X)    ntohs(X)
+#define FON_ID_WRONG        ((fon_id_t)~0)
+#define FON_ID_PACK(X)      (X)
+#define FON_ID_UNPACK(X)    (X)
 
 // FON Function Type
 typedef int                 fon_type_t;

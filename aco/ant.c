@@ -125,7 +125,7 @@ unpack_type(packed_type_t type)
 void
 ant_marshalling(const Ant          *fant,
                 void               **pos,
-                int                *remain)
+                size_t             *remain)
 {
     // TODO 길이체크 루틴 추가해야한다.
 
@@ -140,7 +140,7 @@ ant_marshalling(const Ant          *fant,
 
 Ant*    
 ant_demarshalling(const void         *buf,
-                  int                len,
+                  size_t             len,
                   AcoTable           *table,
                   how_to_send_t      sendto,
                   void               *user_data)

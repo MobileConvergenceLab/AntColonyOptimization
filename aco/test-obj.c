@@ -146,17 +146,23 @@ AntObject* ant_object_new_test()
 void test_masharling(AntObject* obj1)
 {
     char buf[2048];
-    int remain  = 2048;
+    size_t remain  = 2048;
     void *pos   = buf;
 
     AntObject* obj2 = NULL;
 
     ant_object_marshalling(obj1, &pos, &remain);
-    obj2 = ant_object_demarshalling(buf, pos - (void*)buf);
+
+    size_t mashalled_len = pos - (void*)buf;
+    obj2 = ant_object_demarshalling(buf, mashalled_len);
 
     if(ant_object_cmp(obj1, obj2))
     {
-        printf("Test fail\n");
+        printf("Test fail(%s)\n", __FUNCTION__);
+
+	ant_object_print(obj1);
+	ant_object_print(obj2);
+
         exit(-1);
     }
 }

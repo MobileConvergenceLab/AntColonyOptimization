@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 
 	fr.hdr.type = message_type_find;
 	fr.hdr.paylen = sizeof(aco_id_packed_t) + sizeof(aco_cycle_packed_t);
-	fr.target = ACO_ID_PACK(atoi(argv[2]));
+	fr.target = ACO_ID_PACK(inet_addr(argv[2]));
 	fr.ncycle = ACO_CYCLE_PACK(10);
 
 	request_serial(buff, &buflen, &fr.hdr);

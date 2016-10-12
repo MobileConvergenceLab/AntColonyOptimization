@@ -19,7 +19,7 @@ typedef struct _fib_tuple_t
 static inline void
 fib_tuple_print(const fib_tuple_t* tuple)
 {
-    printf("%-8d%-8d%-8d\n", tuple->target, tuple->neighbor, tuple->hops);
+    printf("%s%-8d%-8d\n", inet_ntoa(*(struct in_addr*)&tuple->target), tuple->neighbor, tuple->hops);
 }
 
 #endif // FON_FIB_IF_H

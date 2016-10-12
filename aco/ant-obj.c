@@ -68,7 +68,7 @@ struct __attribute__((packed)) _AntObjectMarshalled {
     uint16_t    npath;
     uint16_t    nvisited;
     uint16_t    ndists;
-    uint16_t    data[];
+    uint8_t     data[];
 };
 
 /*==============================================================================
@@ -183,16 +183,16 @@ _pop_dists(aco_dist_t       *dists,
 }
 
 static void
-_marshalling_ids(uint16_t           data[],
-                 int                *data_index,
+_marshalling_ids(uint8_t            data[],
+                 size_t             *data_index,
                  const aco_id_t     ids[],
                  int                len)
 {
     for(int i=0;
         i<len;
-        i++, (*data_index)++)
+        i++, (*data_index) += sizeof(aco_id_packed_t))
     {
-        data[*data_index] = htons(ids[i]);
+        *(aco_id_packed_t*)(data + *data_index) = ACO_ID_PACK(ids[i]);
     }
 }
 #define _marshalling_walk(obj, data, data_index)        _marshalling_ids(data,  data_index, obj->walk,    obj->nwalk)
@@ -200,31 +200,31 @@ _marshalling_ids(uint16_t           data[],
 #define _marshalling_visited(obj, data, data_index)     _marshalling_ids(data,  data_index, obj->visited,   obj->nvisited)
 
 static void
-_marshalling_dist(uint16_t          data[],
-                  int               *data_index,
+_marshalling_dist(uint8_t           data[],
+                  size_t            *data_index,
                   const aco_dist_t  dists[],
                   int               len)
 {
     for(int i=0;
         i<len;
-        i++, (*data_index)++)
+        i++, (*data_index)+=sizeof(aco_dist_packed_t))
     {
-        data[*data_index] = htons(dists[i]);
+        *(aco_dist_packed_t*)(data + *data_index) = ACO_DIST_PACK(dists[i]);
     }
 }
 #define _marshalling_vhops(obj, data, data_index)       _marshalling_dist(data,  data_index, obj->dists,     obj->ndists)
 
 static void
-_demarshalling_ids(const uint16_t       data[],
-                   int                  *data_index,
+_demarshalling_ids(const uint8_t        data[],
+                   size_t               *data_index,
                    aco_id_t             ids[],
                    int                  len)
 {
     for(int i=0;
         i<len;
-        i++, (*data_index)++)
+        i++, (*data_index)+= sizeof(aco_id_packed_t))
     {
-        ids[i] = ntohs(data[*data_index]);
+        ids[i] = ACO_ID_UNPACK(*(aco_id_packed_t*)(data + *data_index));
     }
 }
 #define _demarshalling_walk(obj, data, data_index)      _demarshalling_ids(data,  data_index, obj->walk,    obj->nwalk)
@@ -232,16 +232,16 @@ _demarshalling_ids(const uint16_t       data[],
 #define _demarshalling_visited(obj, data, data_index)   _demarshalling_ids(data,  data_index, obj->visited,   obj->nvisited)
 
 static void
-_demarshalling_dists(const uint16_t     data[],
-                     int                *data_index,
+_demarshalling_dists(const uint8_t      data[],
+                     size_t             *data_index,
                      aco_dist_t         dists[],
                      int                len)
 {
     for(int i=0;
         i<len;
-        i++, (*data_index)++)
+        i++, (*data_index)+= sizeof(aco_dist_packed_t))
     {
-        dists[i] = ntohs(data[*data_index]);
+        dists[i] = ACO_DIST_UNPACK(*(aco_dist_t*)(data + *data_index));
     }
 }
 #define _demarshalling_vhops(obj, data, data_index)     _demarshalling_dists(data,  data_index, obj->dists,     obj->ndists)
@@ -266,7 +266,8 @@ _calc_marshalled_size(const RealObject  *obj)
 {
     return
         sizeof(AntObjectMarshalled) +
-        sizeof(uint16_t)*(obj->nwalk + obj->npath + obj->nvisited + obj->ndists);
+        sizeof(aco_id_t)*(obj->nwalk + obj->npath + obj->nvisited) +
+        sizeof(aco_dist_t)*(obj->ndists);
 }
 
 static void
@@ -343,7 +344,7 @@ ant_object_print(const AntObject    *fobj)
     const aco_id_t*     walk        = obj->walk;
     const aco_id_t*     visited     = obj->visited;
     const aco_id_t*     path        = obj->path;
-    const aco_dist_t*   vhops       = obj->dists;
+    const aco_dist_t*   dists       = obj->dists;
 
     printf("source:      %-4d\n"
            "destination: %-4d\n"
@@ -360,6 +361,12 @@ ant_object_print(const AntObject    *fobj)
     }
     printf("\n");
 
+    printf("path:        ");
+    for(int i=0; i< obj->npath; i++) {
+        printf("%-4d", path[i]);
+    }
+    printf("\n");
+
     printf("visited:     ");
     for(int i=0; i< obj->nvisited; i++) {
         printf("%-4d", visited[i]);
@@ -368,13 +375,7 @@ ant_object_print(const AntObject    *fobj)
 
     printf("dists:       ");
     for(int i=0; i< obj->ndists; i++) {
-        printf("%-4d", vhops[i]);
-    }
-    printf("\n");
-
-    printf("path:        ");
-    for(int i=0; i< obj->npath; i++) {
-        printf("%-4d", path[i]);
+        printf("%-4d", dists[i]);
     }
     printf("\n\n");
 
@@ -415,7 +416,7 @@ ant_object_print_dbg_hops(
     fprintf(stderr, "%4d\n", obj->dists[obj->nvisited-1]);
 }
 
-void ant_object_marshalling(const AntObject *fobj, void **pos, int *reamin)
+void ant_object_marshalling(const AntObject *fobj, void **pos, size_t *reamin)
 {
     const RealObject    *in_obj     = (const RealObject*)fobj;
     AntObjectMarshalled*
@@ -441,7 +442,7 @@ void ant_object_marshalling(const AntObject *fobj, void **pos, int *reamin)
     marshalled->nvisited    = htons(in_obj->nvisited);
     marshalled->ndists      = htons(in_obj->ndists);
 
-    int data_index  = 0;
+    size_t data_index  = 0;
     _marshalling_walk       (in_obj, marshalled->data, &data_index);
     _marshalling_path       (in_obj, marshalled->data, &data_index);
     _marshalling_visited    (in_obj, marshalled->data, &data_index);
@@ -452,7 +453,7 @@ void ant_object_marshalling(const AntObject *fobj, void **pos, int *reamin)
 
 AntObject*
 ant_object_demarshalling(const void     *in_buf,
-                         int            buflen)
+                         size_t          buflen)
 {
     const AntObjectMarshalled*
                     marshalled = in_buf;
@@ -469,7 +470,7 @@ ant_object_demarshalling(const void     *in_buf,
     obj->nvisited   = ntohs(marshalled->nvisited);
     obj->ndists     = ntohs(marshalled->ndists);
 
-    int data_index = 0;
+    size_t data_index = 0;
     _demarshalling_walk       (obj, marshalled->data, &data_index);
     _demarshalling_path       (obj, marshalled->data, &data_index);
     _demarshalling_visited    (obj, marshalled->data, &data_index);

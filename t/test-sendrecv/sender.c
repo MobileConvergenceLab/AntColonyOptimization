@@ -29,8 +29,8 @@ int main(int argc, char **argv)
     }
 
     port        = atoi(argv[1]);
-    snder_id    = atoi(argv[2]);
-    rcver_id    = atoi(argv[3]);
+    snder_id    = inet_addr(argv[2]);
+    rcver_id    = inet_addr(argv[3]);
 
     client = fon_client_new(FON_TEST_TYPE, port);
     if(client == NULL)

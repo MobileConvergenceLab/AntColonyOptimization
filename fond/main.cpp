@@ -5,7 +5,7 @@
 #define ARGV_INDEX_HOST		(1)
 #define ARGV_INDEX_INTERNAL	(2)
 #define ARGV_INDEX_BRNAME	(3)
-#define ARGV_INDEX_MININET	(4)
+#define ARGV_INDEX_BRCREATE	(4)
 #define ARGV_INDEX_LISTENPORT	(5)
 #define ARGV_INDEX_REQUIRED	(6)
 
@@ -17,7 +17,7 @@ int main(int argc, char **argv)
 	fon_id_t	host;
 	if_name_t	internal;
 	br_name_t	bridge;
-	bool		mininet;
+	bool		br_create;
 	int		port;
 	if_list_t	if_list;
 
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 			<< "  " << "HOST       FON host ID.\n"
 			<< "  " << "INTERNAL   Internal interface which will be conneted to OVS-Bridge.\n"
 			<< "  " << "BRNAME     The name of OVS-Bridge which will be made.\n"
-			<< "  " << "MININET    Mininet mode flag\n"
+			<< "  " << "BR_CREATE  Create Bridge using the given br-name. If Mininet, Do check this flag. \n"
 			<< "  " << "PORT       IPC listen port number\n"
 			<< "  " << "IFLIST     Physical interface names\n"
 			<< std::endl;
@@ -39,10 +39,11 @@ int main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	host		= atoi(argv[ARGV_INDEX_HOST]);
+//	host		= atoi(argv[ARGV_INDEX_HOST]);
+	host		= inet_addr(argv[ARGV_INDEX_HOST]);
 	internal	= if_name_t(argv[ARGV_INDEX_INTERNAL]);
 	bridge		= argv[ARGV_INDEX_BRNAME];
-	mininet		= atoi(argv[ARGV_INDEX_MININET]);
+	br_create	= atoi(argv[ARGV_INDEX_BRCREATE]);
 	port		= atoi(argv[ARGV_INDEX_LISTENPORT]);
 
 	for(int i=ARGV_INDEX_IFLIST; i < argc; i++)
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 				internal,
 				bridge,
 				if_list,
-				mininet,
+				br_create,
 				port);
 
 	daemon->run();

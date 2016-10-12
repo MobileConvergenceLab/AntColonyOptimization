@@ -55,14 +55,14 @@ class MyTopo(Topo):
 '''
 HOSTID	   FON host ID.
 INTERNAL   Internal interface which will be conneted to OVS-Bridge.
-BRNAME	 The name of OVS-Bridge which will be made.
-MININET	Mininet mode flag
+BRNAME	   The name of OVS-Bridge which will be made.
+BRCREATE   
 PORT	   IPC listen port number
-IFLIST	 Physical interface names
+IFLIST	   Physical interface names
 '''
-def run_fond(host, hostid, internal, bridge, mininet, port, iflist, hidden=True):
+def run_fond(host, hostid, internal, bridge, br_create, port, iflist, hidden=True):
 	# 환경변수가 왜 상속이 안되지?
-	cmdstr = '../fond/fond %d %s %s %d %d %s' %(hostid, internal, bridge, mininet, port, iflist)
+	cmdstr = '../fond/fond %s %s %s %d %d %s' %(hostid, internal, bridge, br_create, port, iflist)
 
 	if(hidden == True):
 		cmdstr = cmdstr + ' > /dev/null 2>&1 &' 
@@ -75,17 +75,17 @@ def run_fond(host, hostid, internal, bridge, mininet, port, iflist, hidden=True)
 def all_run_fond(net):
 	i=0
 	for host in net.hosts:
-		hostid = i
+		hostid = "10.0.0.%d" % (i+1)
 		internal = 'h%d-eth0' % (i)
 		bridge = 's%d' % (i)
-		mininet = 1
+		br_create = 1
 		port = 9900 + i
 		iflist = internal
 
 		if(i==0):
-			run_fond(host, hostid, internal, bridge, mininet, port, iflist, False)
+			run_fond(host, hostid, internal, bridge, br_create, port, iflist, False)
 		else:
-			run_fond(host, hostid, internal, bridge, mininet, port, iflist)
+			run_fond(host, hostid, internal, bridge, br_create, port, iflist)
 		i = i+1
 
 def run_acod(host, fon_port, aco_port, hidden=True):

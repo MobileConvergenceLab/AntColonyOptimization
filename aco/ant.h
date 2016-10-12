@@ -38,9 +38,9 @@ Ant*        ant_factory         (int                type,
 void        ant_unref           (Ant                *ant);
 void        ant_marshalling     (const Ant          *ant,
                                  void               **pos,
-                                 int                *remain);
+                                 size_t             *remain);
 Ant*        ant_demarshalling   (const void         *buf,
-                                 int                len,
+                                 size_t             len,
                                  AcoTable           *table,
                                  how_to_send_t      sendto,
                                  void               *user_data);

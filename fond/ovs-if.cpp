@@ -151,20 +151,20 @@ OvsIf::OvsIf(IdTablePtr idtable,
 	if_name_t internal,
 	br_name_t bridge,
 	if_list_t if_list,
-	bool mininet)
+	bool br_create)
 
 	:m_idtable(idtable),
 	m_internal(internal),
 	m_bridge(bridge),
 	m_if_list(if_list),
-	m_mininet(mininet),
+	m_br_create(br_create),
 	m_db(bridge)
 {
 	DBG_LOGGER;
 
 	_ovs_of_check();
 
-	if(!m_mininet)
+	if(!m_br_create)
 	{
 		_make_br(m_bridge);
 		_add_port(m_bridge, m_if_list);
@@ -188,7 +188,7 @@ OvsIf::~OvsIf()
 {
 	DBG_LOGGER;
 
-	if(!m_mininet)
+	if(!m_br_create)
 	{
 		_clean_up_br(m_bridge, m_if_list);
 	}
@@ -245,7 +245,7 @@ bool OvsIf::add_flow_target(fon_id_t target, fon_id_t neighbor)
 		return false;
 	}
 
-	ip_addr_t ip_addr = ip_addr_t("10.0.0.") + std::to_string(target+1);
+	ip_addr_t ip_addr = std::string(inet_ntoa(*(struct in_addr*)&target));
 	ovs_flow_t flow = _make_ip_flow(ip_addr, m_bridge, port, mac_addr);
 
 	auto iter = m_flows.find(target);

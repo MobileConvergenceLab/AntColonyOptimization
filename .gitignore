@@ -3,6 +3,7 @@ Doxyfile
 *.o
 *.d
 *.bak
+*.a
 fon/test-int-pair
 fon/test-object
 fon/html*

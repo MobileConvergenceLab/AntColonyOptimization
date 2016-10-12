@@ -355,7 +355,7 @@ aco_table_max_pheromon(AcoTable       *ftable,
 {
     RealTable* table = (RealTable*)ftable;
 
-    aco_dist_t  neighbor    = ACO_ID_WRONG;
+    aco_id_t    neighbor    = ACO_ID_WRONG;
     aco_ph_t    max_ph      = 0.0;
     int         max_ph_col  = _WRONG_IDX;
     int         ncol        = table->ncol;
@@ -432,14 +432,14 @@ aco_table_print_all(AcoTable        *ftable)
     printf("        ");
     for(int col=0; col<table->ncol; col++)
     {
-        printf("<%3d>                 ", table->col_to_neigh[col]);
+        printf("<%s>                 ", inet_ntoa(*(struct in_addr*)&table->col_to_neigh[col]));
     }
     printf("\n");
 
     // print destinations
     for(int row=0; row<table->nrow; row++)
     {
-        printf("<%3d>   ", table->row_to_target[row]);
+        printf("<%s>   ", inet_ntoa(*(struct in_addr*)&table->row_to_target[row]));
         for(int col=0; col<table->ncol; col++)
         {
             aco_dist_t local_min = table->array[row][col].local_min;

@@ -34,9 +34,9 @@ AntObject*      ant_object_new                  (aco_id_t           source,
 void            ant_object_unref                (AntObject          *obj);
 void            ant_object_marshalling          (const AntObject    *obj,
                                                  void               **pos,
-                                                 int                *remain);
+                                                 size_t             *remain);
 AntObject*      ant_object_demarshalling        (const void         *buf,
-                                                 int                buflen);
+                                                 size_t             buflen);
 void            ant_object_arrived_at           (AntObject          *obj,
                                                  aco_id_t           cur);
 bool            ant_object_change_direction     (AntObject          *obj);

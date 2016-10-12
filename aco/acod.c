@@ -11,7 +11,7 @@
 static void
 _make_pkt(const Ant		*ant,
 	packet_hdr_t		*pkt,
-	int			*remain,
+	size_t			*remain,
 	aco_id_t		host,
 	aco_id_t		neighbor)
 {
@@ -32,7 +32,7 @@ static void _sendto(const Ant* ant,
 {
 	FonClient	*fclient	= ant->user_data;
 	packet_buff_t	pkt		= {0,};
-	int		remain		= sizeof(packet_buff_t);
+	size_t		remain		= sizeof(packet_buff_t);
 
 	_make_pkt(ant, &pkt.hdr, &remain, host, neighbor);
 	fon_sendto(fclient, &pkt.hdr);

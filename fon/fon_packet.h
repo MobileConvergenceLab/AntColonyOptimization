@@ -45,8 +45,8 @@ typedef struct _packet_buff_t {
 static inline void
 pkt_hdr_print(const packet_hdr_t *hdr)
 {
-    printf("sid:  %d\n"
-           "did:  %d\n"
+    printf("sid:  %u\n"
+           "did:  %u\n"
            "type: %d\n"
            "len:  %d\n",
            hdr->sid,
@@ -58,16 +58,6 @@ pkt_hdr_print(const packet_hdr_t *hdr)
 static inline void
 pkt_hdr_check(packet_hdr_t *hdr)
 {
-    if(hdr->sid > FON_ID_MAX)
-    {
-        abort();
-    }
-
-    if(hdr->did > FON_ID_MAX)
-    {
-        abort();
-    }
-
     if(hdr->type > FON_TYPE_MAX)
     {
         abort();
