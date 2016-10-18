@@ -17,7 +17,7 @@ def read_all_logs(logfile_prefix):
     nfile = 0
     try:
         while(True):
-            logfile = '%s_%04d.log' % (logfile_prefix, nfile)
+            logfile = '%s%04d.log' % (logfile_prefix, nfile)
             l.append(read_log(logfile))
             nfile = nfile + 1
     except:
@@ -49,10 +49,10 @@ if __name__ == "__main__":
         min_index, min_value = min(enumerate(l), key=operator.itemgetter(1))
         max_index, max_value = max(enumerate(l), key=operator.itemgetter(1))
 
-        print "Statistic info of %s:\n" % arg,      \
-              "Total Average     : %f\n" % numpy.mean(l),  \
-              "Min Average       : %f\n" % min_value,      \
-              "Max Average       : %f\n" % max_value,      \
-              "Index of Min Aver : %-4d\n" % min_index,      \
-              "Index of Max Aver : %-4d\n\n" % max_index
+        print "Statistic info of %s   :\n" % arg,      \
+              "Total Average          : %f\n" % numpy.mean(l),  \
+              "Min Aver over logs     : %f\n" % min_value,      \
+              "Max Aver over logs     : %f\n" % max_value,      \
+              "File Index of Min Aver : %-4d\n" % min_index,      \
+              "File Index of Max Aver : %-4d\n\n" % max_index
 

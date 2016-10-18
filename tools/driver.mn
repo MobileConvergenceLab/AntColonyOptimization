@@ -48,53 +48,25 @@ def initiate_fon(hosts, port):
         host.cmd(cmdstr)
         i = i+1
 
-def do_kill_aco_node(wait_time, port):
-    time.sleep(wait_time)
-
-    ps = subprocess.Popen(['ps', '-ef'], stdout=subprocess.PIPE)
-    grep = subprocess.Popen(['grep', '[.]/aco -p %d' % port], stdin=ps.stdout, stdout=subprocess.PIPE)
-
-    ps.stdout.close()
-    out, error = grep.communicate()
-    pid = int(out.split()[1])
-    ec = os.system("kill %d" % pid)
-
-    print '=========================================================='
-    print 'Node has been killed'
-    print ' - port:', port
-    print ' - pid:', pid
-    print ' - ec:', ec
-    print '=========================================================='
-
-
-def kill_aco_node(wait_time, port):
-    th = threading.Thread(target=do_kill_aco_node, args=(wait_time, port,))
-    th.start()
-
-def initiate_aco(hosts, agent, port, logfile):
+def initiate_aco(hosts, port, logfile):
     NUM_HOST    = len(hosts)
-
-    kill_aco_node(10, 9914)
 
     i = 0
     for host in hosts:
         if(i!=0):
-            cmdstr = '%s -p %d -t %d > /dev/null 2>&1 &' %(agent, port+i, NUM_HOST)
+            cmdstr = './aco -p %d -t %d > /dev/null 2>&1 &' %(port+i, NUM_HOST)
             host.cmd(cmdstr)
         i = i+1
 
     if(logfile is None):
-        cmdstr = 'xterm -e "%s -p %d -t %d -m"' % (agent, port, NUM_HOST)
+        cmdstr = 'xterm -e "./aco -p %d -t %d -m"' % (port, NUM_HOST)
     else:
-        cmdstr = 'xterm -e "%s -p %d -t %d -l > %s 2>&1"' % (agent, port, NUM_HOST, logfile )
+        cmdstr = 'xterm -e "./aco -p %d -t %d -l > %s 2>&1"' % (port, NUM_HOST, logfile )
     print cmdstr
     hosts[0].cmd(cmdstr)
 
 def return_args():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('agent', metavar='agent', type=str,
-                        help='A aco agent path')
 
     parser.add_argument('topofile', metavar='topofile', type=str,
                         help='A filename or path that describes topology')
@@ -109,7 +81,7 @@ def main():
 
     my_topo = MyTopo(args.topofile)
 
-    net = Mininet(topo=my_topo)
+    net = Mininet(topo=my_topo, controller=None)
     print 'total hosts: %d' % len(net.hosts)
 
     net.start()
@@ -123,7 +95,7 @@ def main():
     time.sleep(3)
 
     print >> sys.stderr,  'initiating ACO at each node'
-    initiate_aco(net.hosts, args.agent, PORT, args.logfile)
+    initiate_aco(net.hosts, PORT, args.logfile)
 
     #CLI(net)
     net.stop()

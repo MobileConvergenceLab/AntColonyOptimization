@@ -1,21 +1,17 @@
 #!/usr/bin/env python
 import os
-import numpy
 import argparse
 
-def conduct_experiments(agent, topo, num, dir):
+def conduct_experiments(topo, num, dir):
 
     l = list()
     for i in range(0, num):
         logfile = './%s/' % dir + '%04d.log' % i
-        os.system("sudo ./driver.mn %s %s -l %s" % (agent, topo, logfile))
+        os.system("sudo ./driver.mn %s -l %s" % (topo, logfile))
         os.system("sync")
 
 def return_args():
     parser = argparse.ArgumentParser()
-
-    parser.add_argument('agent', metavar='agent', type=str,
-                        help='path of aco-routing-agent')
 
     parser.add_argument('topo', metavar='topo', type=str,
                         help='filename or path that describes topology')
@@ -37,6 +33,6 @@ if __name__ == '__main__':
 
     args_hndler_dir(args.dir)
 
-    conduct_experiments(args.agent, args.topo, args.num, args.dir)
+    conduct_experiments(args.topo, args.num, args.dir)
 
 

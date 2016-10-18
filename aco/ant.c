@@ -667,10 +667,10 @@ static void rt_send(RealAnt* ant)
 
         #if ANT_DESTINATION_UPDATE
         aco_id_t neigh = _unicast_forward(ant);
-        _destination_update(table, obj, neigh, ANT_MODEL_SELECTOR);
+        _destination_update(ant->table, obj, neigh, ANT_MODEL_SELECTOR);
         #elif ANT_ACS_UPDATE
-        _unicast_forward(ant);
-        _acs_update(table, obj, neigh);
+        aco_id_t neigh = _unicast_forward(ant);
+        _acs_update(ant->table, obj, neigh);
         #else
         _unicast_forward(ant);
         #endif
