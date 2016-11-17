@@ -5,6 +5,12 @@ Email: ybsim@khu.ac.kr
 
 CopyRight(c) MobileConvergence Lab. in KyungHee Univ. All rights reserved.
 
+# Dependencies
+
+* glib(NOT glibc)
+* ovs utilities - ovs-vsctl, ovs-apptcl, ovs-ofctl
+* pstream [http://pstreams.sourceforge.net/]
+
 # Demo:
 
 ## On Demand-routing demonstration

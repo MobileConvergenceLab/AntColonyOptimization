@@ -1,4 +1,5 @@
 CC          = gcc
+TAGS        = tags
 
 WARNINGS    += -W -Wall -Wshadow
 WARNINGS    += -Wno-unused-function
@@ -30,7 +31,10 @@ $(FONLIB): $(OBJS)
 	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(OBJS) $(FONLIB)
+	$(RM) $(OBJS) $(FONLIB) $(TAGS)
+
+$(TAGS):
+	ctags -n -R
 
 re-build:
 	make clean

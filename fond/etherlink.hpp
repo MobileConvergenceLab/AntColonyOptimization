@@ -30,7 +30,7 @@ public:
 private:
 	GMainContext		*m_context;
 	GMainLoop		*m_loop;
-	if_name_t			m_ifname;
+	if_name_t		m_ifname;
 	IdTablePtr		m_idtable;
 	IpcManagerPtr		m_cm;
 	uint16_t		m_ethertype_data;

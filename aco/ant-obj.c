@@ -5,8 +5,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include <fon/fon_defs.h>
 #include "ant-def.h"
-
 #include "ant-obj.h"
 
 
@@ -508,9 +508,7 @@ ant_object_change_direction(AntObject *fobj)
     if(obj->direction == ANT_OBJ_DIRECTION_FORWARD &&
         obj->destination == obj->walk[obj->nwalk - 1])
     {
-        int tmp         = obj->source;
-        obj->source     = obj->destination;
-        obj->destination = tmp;
+        SWAP(obj->source, obj->destination, aco_id_t);
 
         obj->direction  = ANT_OBJ_DIRECTION_BACKWARD;
         obj->cur_ttl    = obj->ini_ttl;

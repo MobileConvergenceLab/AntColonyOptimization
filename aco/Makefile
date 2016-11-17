@@ -1,5 +1,6 @@
 CC          = gcc
 DEPENDENCY  = dependency
+TAGS        = tags
 
 INCLUDE     += -I../
 INCLUDE     += `pkg-config --cflags glib-2.0`
@@ -61,9 +62,9 @@ $(TEST_DAEMON): $(OBJS) $(TEST_DAEMON).o
 	$(CC) $< $(CFLAGS)
 
 clean:
-	$(RM) $(TARGETS) *.o $(DEPENDENCY)
+	$(RM) $(TARGETS) $(DEPENDENCY) $(TAGS) *.o
 
-tag:
+$(TAGS):
 	ctags -n -R
 
 $(DEPENDENCY):

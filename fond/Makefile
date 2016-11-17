@@ -1,4 +1,5 @@
 CXX         = g++
+TAGS        = tags
 
 INCLUDE     += -I../
 INCLUDE     += `pkg-config --cflags glib-2.0`
@@ -12,7 +13,6 @@ WARNINGS    += -Wno-unused-function
 WARNINGS    += -Wno-missing-field-initializers
 
 CXXFLAGS    += -c
-#CXXFLAGS   += -pthread
 CXXFLAGS    += -std=c++11
 CXXFLAGS    += -g
 CXXFLAGS    += -DDBG
@@ -21,10 +21,8 @@ CXXFLAGS    += $(WARNINGS)
 
 LDFLAGS     += $(LIBS)
 
-SRCS        += neighbor.cpp etherlink.cpp packet.cpp fib.cpp ovs-if.cpp fib.cpp  packet.cpp
-SRCS        += ipcmanager.cpp
-SRCS        += msg_hndler.cpp
-SRCS        += ovs-fdb.cpp
+SRCS        += idtable.cpp neighbor.cpp etherlink.cpp packet.cpp fib.cpp ipcmanager.cpp msg_hndler.cpp
+SRCS        += ovs-fdb.cpp ovs-if.cpp
 SRCS        += fond.cpp
 OBJS        = $(SRCS:.cpp=.o)
 
@@ -60,8 +58,11 @@ $(TEST_IPC): $(OBJS) $(TEST_IPC).o
 %.o: %.cpp
 	$(CXX) $< $(CXXFLAGS)
 
+$(TAGS):
+	ctags -n -R
+
 clean:
-	$(RM) $(TARGET) $(TESTS) $(DEPENDENCY) *.o
+	$(RM) $(TARGET) $(TESTS) $(DEPENDENCY) $(TAGS) *.o
 
 re-build:
 	make clean

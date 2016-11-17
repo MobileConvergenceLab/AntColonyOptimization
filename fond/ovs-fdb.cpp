@@ -1,6 +1,6 @@
 #include <stdexcept>
 #include <sstream>
-#include <pstreams/pstream.h>
+#include <pstreams/pstream.h> // See [http://pstreams.sourceforge.net/]
 #include "dbg.hpp"
 #include "ovs-fdb.hpp"
 

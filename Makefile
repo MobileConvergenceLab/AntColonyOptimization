@@ -12,6 +12,7 @@ tag:
 clean:
 	cd ./aco && make clean
 	cd ./t && make clean
+	cd ./tools && make clean
 	cd ./fond && make clean
 	cd ./fon && make clean
 

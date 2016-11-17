@@ -108,7 +108,7 @@ static void _bind_fd(
 	return;
 } // _bind_fd()
 
-static void _sall_set_boradcast(struct sockaddr_ll *sa_ll, uint16_t ethertype, int ifindex)
+static inline void _sall_set_boradcast(struct sockaddr_ll *sa_ll, uint16_t ethertype, int ifindex)
 {
 	sa_ll->sll_family	= AF_PACKET;
 	sa_ll->sll_protocol	= htons(ethertype);
