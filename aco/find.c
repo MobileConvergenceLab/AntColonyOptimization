@@ -17,13 +17,23 @@ int main(int argc, char **argv)
 	char 			buff[1024];
 	size_t 			buflen = sizeof(buff);
 	int			sendbyte = 0;
+	in_addr_t 		target;
 
-	if(argc ==1)
+	if(argc == 1)
 	{
 		printf("Wrong argument\n");
 		ret = -1;
 		goto RETURN;
 	}
+
+	target = inet_addr(argv[2]);
+	if(target == -1)
+	{
+		printf("Wrong Address Format\n");
+		ret = -1;
+		goto RETURN;
+	}
+	fr.target = ACO_ID_PACK(target);
 
 	ipc_port = atoi(argv[1]);
 	fprintf(stderr, "port: %d\n", ipc_port);
@@ -48,7 +58,7 @@ int main(int argc, char **argv)
 
 	fr.hdr.type = message_type_find;
 	fr.hdr.paylen = sizeof(aco_id_packed_t) + sizeof(aco_cycle_packed_t);
-	fr.target = ACO_ID_PACK(inet_addr(argv[2]));
+	//fr.target = ACO_ID_PACK(inet_addr(argv[2]));
 	fr.ncycle = ACO_CYCLE_PACK(10);
 
 	request_serial(buff, &buflen, &fr.hdr);
