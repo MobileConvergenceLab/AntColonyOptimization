@@ -30,7 +30,7 @@ TEST_OBJ    = test-obj
 TEST_TABLE  = test-table
 TEST_ANT    = test-ant
 #UNIT_TESTS  = $(TEST_OBJ) $(TEST_TABLE) $(TEST_ANT) $(TEST_DAEMON)
-UNIT_TESTS  = $(TEST_OBJ)
+UNIT_TESTS  = $(TEST_OBJ) $(TEST_TABLE)
 
 # Executables
 TARGETS     = $(ACOD) $(FIND) $(UNIT_TESTS)

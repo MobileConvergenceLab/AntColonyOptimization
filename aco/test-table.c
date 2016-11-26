@@ -36,6 +36,18 @@ void test_iter(AcoTable* table, int target)
     return;
 }
 
+void test_new_targets(AcoTable* table)
+{
+	aco_ids_t targets = NULL;
+
+	targets = aco_table_new_targets(table);
+
+	printf("%d\n", (int)targets[0]);
+	printf("%d\n", (int)targets[1]);
+	printf("%d\n", (int)targets[2]);
+	printf("%d\n", (int)targets[3]);
+}
+
 int main(int argc, char **argv) {
 
     AcoTable* table = test_new();
@@ -49,6 +61,9 @@ int main(int argc, char **argv) {
     test_iter(table, 3);
     test_iter(table, 4);
     test_iter(table, 5);
+
+
+    test_new_targets(table);
 
     printf("Test Successful\n");
 

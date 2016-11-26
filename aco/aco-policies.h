@@ -5,7 +5,7 @@
  * Parameters
  *==============================================================================*/
 // Evaporation rate of pheromone
-#define     CYCLE_INTERVAL              (2000)
+#define     CYCLE_INTERVAL              (200)
 #define     PACKETS_PER_CYCLE           (10)
 #define     ENDURANCE_MAX               (PACKETS_PER_CYCLE*2)
 #define     PHEROMONE_MAX               (99.9)
@@ -20,13 +20,13 @@
 // 개미 모델 선택
 // - 개미 모델에 따라서 성능차이가 현저하게 들어남
 // - ant-model.[hc] 파일 참조
-#define     ANT_MODEL_SELECTOR          (ant_normalizing_model)
+#define     ANT_MODEL_SELECTOR          (ant_colony_system_model)
 
 // Endurance 알고리즘 적용 여부
 // 개미를 송신할때마다 Endurance값이 줄어드며
 // 하나라도 수신하면 초기값으로 돌아간다.
 // 만약 0이 되면 경로를 재탐색한다.
-#define     ENDURANCE_ENABLE            (0)
+#define     ENDURANCE_ENABLE            (1)
 
 // 페로몬 업데이트 정책 선택
 // - 개미(패킷)을 수신했을때 테이블을 업데이트할지, 아니면
@@ -44,9 +44,9 @@
 #endif
 
 // 백트랙 업데이트 알고리즘 적용 여부
-#define     ANT_BACKTRACK_UPDATE        (0)
+#define     ANT_BACKTRACK_UPDATE        (1)
 
 // 주기적으로 증발 시킬지 여부
-#define     POLICY_EVAPORATE_ENABLE     (0)
+#define     POLICY_EVAPORATE_ENABLE     (1)
 
 #endif // ANT_PARAMETERS_H

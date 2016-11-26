@@ -7,7 +7,7 @@ CopyRight(c) MobileConvergence Lab. in KyungHee Univ. All rights reserved.
 
 # Dependencies
 
-* glib(NOT glibc)
+* glib(NOT glibc) 2.48.1
 * ovs utilities - ovs-vsctl, ovs-apptcl, ovs-ofctl
 * pstream [http://pstreams.sourceforge.net/]
 

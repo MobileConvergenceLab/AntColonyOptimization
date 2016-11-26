@@ -403,29 +403,35 @@ static gboolean _client_handler(gint fd,
 		{
 			struct find_reqeust *fr = (struct find_reqeust *)hdr;
 			aco_id_t target = ACO_ID_UNPACK(fr->target);
-			aco_cycle_t ncycle = ACO_CYCLE_UNPACK(fr->ncycle);
-
-			printf("type(%d) paylen(%d) target(%d) ncycle(%d)\n",
-				hdr->type,
-				hdr->paylen,
-				target,
-				ncycle);
-
-			int npacket_per_cycle	= 10;
-			// the timeout interval in milliseconds
-			guint interval		= 2000;
 
 			if(!aco_table_is_neigh(daemon->table, target) &&
 			!aco_table_is_target(daemon->table, target))
 			{
-				aco_table_add_target(daemon->table, target);
+				aco_daemon_flist_add(daemon, target);
 			}
+
+			#if !POLICY_EVAPORATE_ENABLE
+			int npacket_per_cycle	= 10;
+			// the timeout interval in milliseconds
+			guint interval		= 2000;
+
+			aco_cycle_t ncycle = ACO_CYCLE_UNPACK(fr->ncycle);
 
 			aco_daemon_request_attach(daemon,
 						target,
 						ncycle,
 						npacket_per_cycle,
 						interval);
+			#endif
+
+			/*
+			printf("type(%d) paylen(%d) target(%d) ncycle(%d)\n",
+				hdr->type,
+				hdr->paylen,
+				target,
+				ncycle);
+			*/
+
 		}
 		break;
 	default:
@@ -569,8 +575,35 @@ static void _aco_daemon_init_fclient(AcoDaemon* daemon)
 
 #if POLICY_EVAPORATE_ENABLE
 // compatible with GSourceFunc
+static void _sendall(AcoDaemon* daemon)
+{
+	aco_id_t source = 0;
+
+	fon_host_get(daemon->fclient, &source);
+
+	for(aco_id_t *target = daemon->flist;
+			(int)*target != -1;
+			target++)
+	{
+		Ant* ant = ant_factory(ANT_TYPE_ROUNDTRIP,
+					source,
+					*target,
+					daemon->table,
+					_sendto,
+					daemon->fclient);
+
+		for(int i=0; i< PACKETS_PER_CYCLE; i++)
+		{
+			ant_send(ant);
+		}
+		ant_unref(ant);
+	}
+}
+
 static gboolean _evaporate_update_handler(AcoDaemon* daemon)
 {
+	_sendall(daemon);
+
 	aco_table_evaporate_all(daemon->table,
 				ANT_REMAIN_RATE);
 
@@ -602,6 +635,17 @@ static void _aco_daemon_init_table(AcoDaemon* daemon)
 		exit(EXIT_FAILURE);
 	}
 	#endif
+}
+
+static void
+_aco_daemon_init_list(AcoDaemon* daemon)
+{
+	for(size_t i=0; i<1024; i++)
+	{
+		*(int*)(daemon->flist+i) = -1;
+	}
+
+	daemon->flist_len = 0;
 }
 
 static void _aco_daemon_init(AcoDaemon* daemon, aco_parameters *para)
@@ -640,6 +684,7 @@ AcoDaemon* aco_daemon_create(aco_parameters *para)
 	_aco_daemon_init_context(daemon);
 	_aco_daemon_init_fclient(daemon);
 	_aco_daemon_init_table(daemon);
+	_aco_daemon_init_list(daemon);
 
 	// Init listen port
 	_aco_daemon_accept_attach(daemon);
@@ -651,6 +696,7 @@ AcoDaemon* aco_daemon_create(aco_parameters *para)
 
 	// 주기적으로 테이블 출력
 	_aco_daemon_add_event_print_table(daemon, 3000);
+
 
 	return daemon;
 }
@@ -671,7 +717,6 @@ void aco_daemon_request_attach(AcoDaemon* daemon,
 	arg->cycle = 0;
 	arg->ncycle = ncycle;
 	arg->npacket_per_cycle = npacket_per_cycle;
-
 	//g_print("Call forward_timeout_add()\n");
 	if(!_add_timeout_source(daemon->context,
 				(GSourceFunc)_request_handler,
@@ -689,3 +734,9 @@ void aco_daemon_run(AcoDaemon* daemon)
 	g_main_loop_run(daemon->loop);
 }
 
+void aco_daemon_flist_add(AcoDaemon* daemon, aco_id_t target)
+{
+	daemon->flist[daemon->flist_len++] = target;
+	
+	aco_table_add_target(daemon->table, target);
+}
