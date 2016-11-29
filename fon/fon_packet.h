@@ -7,10 +7,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "fon_defs.h"
+//#include "fon_defs.h"
 #include "fon_types.h"
-
-FON_BEGIN_EXTERN_C
 
 enum PACKET_TYPE {
     PACKET_TYPE_NONE    = 0,
@@ -41,6 +39,11 @@ typedef struct _packet_buff_t {
     /* 2KiB fit */
     uint8_t         data[0x0800 - sizeof(packet_hdr_t)];
 } packet_buff_t;
+
+
+#ifdef __cpluscplus
+extern "C" {
+#endif
 
 static inline void
 pkt_hdr_print(const packet_hdr_t *hdr)
@@ -99,6 +102,8 @@ pkt_cpy(packet_hdr_t *dest, int buflen, packet_hdr_t *src)
     memcpy(dest, src, buflen);
 }
 
-FON_END_EXTERN_C
+#ifdef __cpluscplus
+};
+#endif
 
 #endif // FON_PACKET_H

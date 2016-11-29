@@ -1,12 +1,13 @@
 #ifndef FON_IPC_H
 #define FON_IPC_H
 
-#include "fon_defs.h"
 #include "fon_types.h"
 #include "fon_ipc_defs.h"
 #include "fon_ipc_msgs.h"
 
-FON_BEGIN_EXTERN_C
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void msg_req_print      (msg_req_hdr_t  *in);
 void msg_req_cpy        (msg_req_hdr_t  *dest,
@@ -33,6 +34,8 @@ bool msg_rsp_recv       (int            fd,
                          msg_rsp_hdr_t  *out,
                          int            buflen);
 
-FON_END_EXTERN_C
+#ifdef __cpluscplus
+};
+#endif
 
 #endif // FON_IPC_H

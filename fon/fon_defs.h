@@ -13,14 +13,6 @@
   #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
 #endif
 
-#ifdef __cplusplus
-  #define FON_BEGIN_EXTERN_C    extern "C" {
-  #define FON_END_EXTERN_C      }
-#else
-  #define FON_BEGIN_EXTERN_C
-  #define FON_END_EXTERN_C
-#endif
-
 /* if compiler version is c99 */
 #if __STDC_VERSION__ == 199901L
 extern char *strdup(const char *s);

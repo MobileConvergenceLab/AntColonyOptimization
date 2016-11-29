@@ -5,10 +5,11 @@ Email: ybsim@khu.ac.kr
 
 CopyRight(c) MobileConvergence Lab. in KyungHee Univ. All rights reserved.
 
-# Dependencies
+# Dependencies(Tested)
 
+* Ubuntu 16.04(Kernal 4.4.0-47-generic)
 * glib(NOT glibc) 2.48.1
-* ovs utilities - ovs-vsctl, ovs-apptcl, ovs-ofctl
+* ovs utilities 2.5.0 version - ovs-vsctl, ovs-apptcl, ovs-ofctl
 * pstream [http://pstreams.sourceforge.net/]
 
 # Demo:

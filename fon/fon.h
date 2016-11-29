@@ -10,8 +10,9 @@
 #include "fon_ipc.h"
 #include "fon_client.h"
 
-
-FON_BEGIN_EXTERN_C
+#ifdef __cpluscplus
+extern "C" {
+#endif
 
 FonClient*  fon_client_new              (fon_type_t     in_type,
                                          int            in_port);
@@ -30,7 +31,8 @@ bool        fon_host_get                (FonClient      *client,
                                          fon_id_t       *out_id);
 fon_type_t  fon_get_type                (FonClient      *client);
 
-
-FON_END_EXTERN_C
+#ifdef __cpluscplus
+};
+#endif
 
 #endif /* FCLIENT_H */

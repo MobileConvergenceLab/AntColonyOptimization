@@ -5,6 +5,7 @@ Doxyfile
 *.bak
 *.a
 dependency
+*.swap
 
 #
 fon/test-int-pair
