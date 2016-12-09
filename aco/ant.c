@@ -50,7 +50,6 @@ static RealAnt* _real_ant_new       (AcoTable* table, AntObject* obj, how_to_sen
 static void _unicast_pkt            (const Ant *ant, aco_id_t neighbor);
 static int _unicast_forward         (RealAnt *ant);
 static int _unicast_backward        (RealAnt *ant);
-static void _update_statistics      (RealAnt *ant);
 static void _pheromone_update       (AcoTable* table, aco_id_t target, aco_id_t neigh, aco_dist_t dist, AntModel model);
 static void _backtrack_update       (AcoTable* table, AntObject* obj);
 static void _source_update          (AcoTable* table, AntObject* obj, AntModel model);
@@ -353,22 +352,6 @@ static int _unicast_backward(RealAnt *ant)
     _unicast_pkt((Ant*)ant, neighbor);
 
     return neighbor;
-}
-
-static void _update_statistics(RealAnt *ant)
-{
-    AcoTable    *table  = ant->table;
-    AntObject   *obj    = ant->obj;
-
-    if(ant_object_is_backtracked(obj))
-    {
-        return;
-    }
-
-    aco_table_rx_info_update(table,
-                    obj->source,
-                    ant_object_previous(obj),
-                    ant_object_dist(obj));
 }
 
 static void _backtrack_update(AcoTable* table, AntObject* obj)
