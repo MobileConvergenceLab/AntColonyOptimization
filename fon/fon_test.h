@@ -3,7 +3,7 @@
 
 #include "fon.h"
 
-#ifdef __cpluscplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -12,8 +12,8 @@ void    fon_test_table_add          (FonClient *client, fon_id_t id);
 void    fon_test_tuple_print        (const fib_tuple_t *tuple);
 void    fon_test_table_print        (FonClient *client);
 
-#ifdef __cpluscplus
-};
+#ifdef __cplusplus
+}
 #endif
 
 #endif

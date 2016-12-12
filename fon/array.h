@@ -23,7 +23,7 @@ typedef struct _Array Array;
 
 #define array_index(A, T, I)       (*(T*)(A->data + I*A->el_size))
 
-#ifdef __cpluscplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -33,8 +33,8 @@ void        array_unref             (Array *array);
 void        array_append            (Array *array, void *data);
 void        array_append_vals       (Array *array, void *data, int len);
 
-#ifdef __cpluscplus
-};
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* ARRAY_H */

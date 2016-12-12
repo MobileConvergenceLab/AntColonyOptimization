@@ -16,10 +16,18 @@ typedef struct _fib_tuple_t
     int             validation;
 } fib_tuple_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static inline void
 fib_tuple_print(const fib_tuple_t* tuple)
 {
     printf("%s%-8d%-8d\n", inet_ntoa(*(struct in_addr*)&tuple->target), tuple->neighbor, tuple->hops);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // FON_FIB_IF_H

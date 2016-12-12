@@ -41,7 +41,7 @@ typedef struct _packet_buff_t {
 } packet_buff_t;
 
 
-#ifdef __cpluscplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -102,8 +102,8 @@ pkt_cpy(packet_hdr_t *dest, int buflen, packet_hdr_t *src)
     memcpy(dest, src, buflen);
 }
 
-#ifdef __cpluscplus
-};
+#ifdef __cplusplus
+}
 #endif
 
 #endif // FON_PACKET_H

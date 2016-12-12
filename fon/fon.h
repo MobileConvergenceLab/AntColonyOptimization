@@ -10,7 +10,7 @@
 #include "fon_ipc.h"
 #include "fon_client.h"
 
-#ifdef __cpluscplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -31,8 +31,8 @@ bool        fon_host_get                (FonClient      *client,
                                          fon_id_t       *out_id);
 fon_type_t  fon_get_type                (FonClient      *client);
 
-#ifdef __cpluscplus
-};
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* FCLIENT_H */

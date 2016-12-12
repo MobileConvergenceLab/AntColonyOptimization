@@ -34,8 +34,8 @@ bool msg_rsp_recv       (int            fd,
                          msg_rsp_hdr_t  *out,
                          int            buflen);
 
-#ifdef __cpluscplus
-};
+#ifdef __cplusplus
+}
 #endif
 
 #endif // FON_IPC_H
