@@ -23,7 +23,10 @@ extern "C" {
 static inline void
 fib_tuple_print(const fib_tuple_t* tuple)
 {
-    printf("%s%-8d%-8d\n", inet_ntoa(*(struct in_addr*)&tuple->target), tuple->neighbor, tuple->hops);
+    printf("%s,%s,%-8d\n",
+	inet_ntoa(*(struct in_addr*)&tuple->target),
+	inet_ntoa(*(struct in_addr*)&tuple->neighbor),
+	tuple->hops);
 }
 
 #ifdef __cplusplus

@@ -17,6 +17,7 @@ These are dependent libraries and softwares.
 * glib(NOT glibc) 2.48.1
 * ovs utilities 2.5.0 version - Also ovs-vsctl, ovs-apptcl, ovs-ofctl are same version.
 * pstream 0.8.0-2 [http://pstreams.sourceforge.net/]
+* mininet 2.2.1-2 (need when use emulation)
 
 # Demo:
 

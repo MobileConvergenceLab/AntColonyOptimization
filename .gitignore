@@ -19,5 +19,5 @@ aco/test-ant
 test-ipc/main
 test-sendrecv/receiver
 test-sendrecv/sender
-emulation/*
+emulation_result/*
 
